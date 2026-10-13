@@ -25,7 +25,7 @@ npm run build
 1. Создай проект Supabase.
 2. Выполни `supabase/schema.sql` в SQL Editor своего проекта.
 3. Создай `.env.local` по образцу `.env.example`. Укажи URL проекта и **публичный anon/publishable ключ**, не service-role и не secret key.
-4. Для входа Google включи Google Provider в Supabase Authentication. Добавь callback Supabase в Google OAuth. Инструкции в `supabase/README.md`.
+4. Для входа Google включи Google Provider в Supabase Authentication. Добавь callback Supabase в Google OAuth и выставь `VITE_AUTH_GOOGLE=true`. До настройки кнопка Google скрыта. Инструкции в `supabase/README.md`.
 5. В Supabase Authentication → URL Configuration добавь адрес опубликованного сайта в Site URL и Redirect URLs; для разработки добавь `http://127.0.0.1:5173`.
 6. Перезапусти dev-сервер после изменения переменных.
 

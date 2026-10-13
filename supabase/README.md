@@ -15,7 +15,7 @@
 
 4. В **Authentication → URL Configuration** задайте Site URL опубликованного сайта. Добавьте `http://127.0.0.1:5173` и точный HTTPS-адрес Vercel в Redirect URLs. Если порт локального сервера другой, добавьте и его.
 5. В **Authentication → Providers → Email** включите вход по email. При включённом подтверждении email игроку необходимо открыть письмо до первого входа. Для надёжной доставки настоящим пользователям настройте SMTP; встроенная почта Supabase имеет ограничения.
-6. Для Google создайте OAuth-клиент в Google Cloud, добавьте показанный Supabase callback URL в Authorized redirect URIs, включите Google в Supabase и укажите Client ID/Secret **только там**. Добавьте свой домен и тестовые аккаунты согласно настройкам OAuth consent screen Google.
+6. Для Google создайте OAuth-клиент в Google Cloud, добавьте показанный Supabase callback URL в Authorized redirect URIs, включите Google в Supabase и укажите Client ID/Secret **только там**. Добавьте свой домен и тестовые аккаунты согласно настройкам OAuth consent screen Google. После настройки задайте `VITE_AUTH_GOOGLE=true` локально и в Vercel; до этого кнопка Google скрыта.
 7. Перезапустите локальный сервер после изменения `.env.local`.
 
 ## Vercel

@@ -203,8 +203,11 @@ function showRules() {
   );
 }
 function showAuth(signup = false) {
+  const googleOption = online.isGoogleConfigured
+    ? '<button class="google-button" data-action="google"><span>G</span> Продолжить с Google</button><div class="divider"><span>или через почту</span></div>'
+    : "";
   modal(
-    `<span class="eyebrow">WELCOME TO THE CLUB</span><h2>${signup ? "Твой первый шаг." : "Снова на арену."}</h2><p class="modal-sub">${online.isOnlineConfigured ? "Войди, чтобы соревноваться и сохранять рейтинг." : "Регистрация будет доступна после подключения Supabase. Соло и демо уже работают."}</p>${online.isOnlineConfigured ? `<button class="google-button" data-action="google"><span>G</span> Продолжить с Google</button><div class="divider"><span>или через почту</span></div><form id="auth-form" data-signup="${signup}">${signup ? '<label>Никнейм<input name="username" required minlength="2" maxlength="24" placeholder="Например, wordhunter" autocomplete="nickname" /></label>' : ""}<label>Email<input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label><label>Пароль<input type="password" name="password" required minlength="8" placeholder="Не менее 8 символов" autocomplete="${signup ? "new-password" : "current-password"}" /></label><p id="auth-error" class="form-error" role="alert"></p><button type="submit" class="button dark full">${signup ? "Создать аккаунт" : "Войти"} ${icons.arrow}</button></form><p class="auth-switch">${signup ? "Уже есть аккаунт?" : "Первый раз здесь?"} <button data-action="${signup ? "signin" : "signup"}">${signup ? "Войти" : "Зарегистрироваться"}</button></p>` : `<div class="connection-note">${icons.user}<p>Онлайн требует собственного проекта Supabase. Код регистрации, матчей и рейтинга уже подготовлен.</p></div><button class="button dark full" data-action="solo">Пока сыграть соло ${icons.arrow}</button>`}`,
+    `<span class="eyebrow">WELCOME TO THE CLUB</span><h2>${signup ? "Твой первый шаг." : "Снова на арену."}</h2><p class="modal-sub">${online.isOnlineConfigured ? "Войди, чтобы соревноваться и сохранять рейтинг." : "Регистрация будет доступна после подключения Supabase. Соло и демо уже работают."}</p>${online.isOnlineConfigured ? `${googleOption}<form id="auth-form" data-signup="${signup}">${signup ? '<label>Никнейм<input name="username" required minlength="2" maxlength="24" placeholder="Например, wordhunter" autocomplete="nickname" /></label>' : ""}<label>Email<input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label><label>Пароль<input type="password" name="password" required minlength="8" placeholder="Не менее 8 символов" autocomplete="${signup ? "new-password" : "current-password"}" /></label><p id="auth-error" class="form-error" role="alert"></p><button type="submit" class="button dark full">${signup ? "Создать аккаунт" : "Войти"} ${icons.arrow}</button></form><p class="auth-switch">${signup ? "Уже есть аккаунт?" : "Первый раз здесь?"} <button data-action="${signup ? "signin" : "signup"}">${signup ? "Войти" : "Зарегистрироваться"}</button></p>` : `<div class="connection-note">${icons.user}<p>Онлайн требует собственного проекта Supabase. Код регистрации, матчей и рейтинга уже подготовлен.</p></div><button class="button dark full" data-action="solo">Пока сыграть соло ${icons.arrow}</button>`}`,
   );
 }
 function showDemoChoice() {
@@ -552,6 +555,7 @@ async function submitCurrent() {
   try {
     const result = await online.submitAnswer(m.id, submittedIndex, input.value);
     if (state.match !== m || m.index !== submittedIndex) return;
+    m.acceptedIndex = submittedIndex;
     const feedback = document.querySelector("#answer-feedback");
     if (feedback) {
       feedback.className =
@@ -562,13 +566,13 @@ async function submitCurrent() {
     }
     await pollMatch(false);
   } catch (error) {
-    toast(error.message);
     if (state.match !== m || m.index !== submittedIndex) return;
+    toast(error.message);
     const feedback = document.querySelector("#answer-feedback");
     if (feedback) feedback.textContent = "Проверяем статус ответа…";
     await pollMatch(false);
   } finally {
-    m.submitting = null;
+    if (m.submitting === submittedIndex) m.submitting = null;
     if (state.match === m && m.index === submittedIndex) {
       document
         .querySelector("#answer")
@@ -700,15 +704,17 @@ async function startQueue() {
   const generation = ++queueGeneration;
   stopGame();
   closeModal();
+  const mode = state.mode,
+    level = state.level;
   try {
-    const queue = await online.joinQueue(state.mode, state.level);
+    const queue = await online.joinQueue(mode, level);
     if (generation !== queueGeneration) return;
     if (queue.match_id) {
       startOnline(queue.match_id);
       return;
     }
     modal(
-      `<span class="eyebrow">FINDING YOUR MATCH</span><h2>Ищем твоего<br>соперника.</h2><div class="queue-animation"><span>a</span><i>×</i><span>?</span></div><p class="modal-sub">${modes[state.mode].name} · ${state.level}<br>Подбираем игроков с близким рейтингом.</p><p class="queue-time" id="queue-time">00:00</p><button class="button outline full" data-action="cancel-queue">Отменить поиск</button>`,
+      `<span class="eyebrow">FINDING YOUR MATCH</span><h2>Ищем твоего<br>соперника.</h2><div class="queue-animation"><span>a</span><i>×</i><span>?</span></div><p class="modal-sub">${modes[mode].name} · ${level}<br>Подбираем игроков с близким рейтингом.</p><p class="queue-time" id="queue-time">00:00</p><button class="button outline full" data-action="cancel-queue">Отменить поиск</button>`,
     );
     dialog.querySelector(".modal-close").remove();
     dialog.oncancel = (e) => {
@@ -738,9 +744,20 @@ async function startQueue() {
           clearInterval(queueTimer);
           closeModal();
           startOnline(q.match_id);
+        } else if (q?.status === "idle") {
+          clearInterval(queueTimer);
+          queueTimer = null;
+          queueActive = false;
+          queueGeneration++;
+          closeModal();
+          toast(
+            "Поиск остановлен после потери связи. Нажми «Играть», чтобы начать снова.",
+          );
         }
       } catch (error) {
+        if (generation !== queueGeneration) return;
         clearInterval(queueTimer);
+        queueTimer = null;
         queueActive = false;
         closeModal();
         toast(error.message);
@@ -749,25 +766,30 @@ async function startQueue() {
       }
     }, 1500);
   } catch (error) {
+    if (generation !== queueGeneration) return;
     queueActive = false;
     toast(error.message);
   }
 }
 async function cancelQueue() {
-  queueGeneration++;
-  queueActive = false;
+  const generation = ++queueGeneration;
+  // Keep new searches blocked until the server finishes cancelling the old one.
+  queueActive = true;
   clearInterval(queueTimer);
+  queueTimer = null;
+  closeModal();
   try {
     await online.cancelQueue();
   } catch (error) {
-    toast(error.message);
+    if (generation === queueGeneration) toast(error.message);
+  } finally {
+    if (generation === queueGeneration) queueActive = false;
   }
-  closeModal();
 }
 async function startOnline(id) {
   queueActive = false;
   closeModal();
-  state.match = {
+  const m = (state.match = {
     id,
     local: false,
     mode: state.mode,
@@ -776,25 +798,26 @@ async function startOnline(id) {
     players: [],
     answered: false,
     finished: false,
-  };
+  });
   state.page = "game";
   render();
   try {
     await pollMatch(true);
+    if (state.match !== m || m.finished) return;
     pollTimer = setInterval(() => pollMatch(false), 1200);
     gameTimer = setInterval(tickOnline, 100);
   } catch (error) {
+    if (state.match !== m) return;
     stopGame();
     state.page = "arena";
     render();
     toast(error.message);
   }
 }
-let polling = false;
 async function pollMatch(initial = false) {
   const m = state.match;
-  if (!m || m.local || m.finished || polling) return;
-  polling = true;
+  if (!m || m.local || m.finished || m.polling) return;
+  m.polling = true;
   try {
     const data = await online.getMatchState(m.id);
     if (state.match !== m) return;
@@ -807,20 +830,26 @@ async function pollMatch(initial = false) {
     m.players = data.players || [];
     if (data.status === "finished" || Date.now() + m.offset >= m.ends) {
       const final = await online.finishMatch(m.id);
+      if (state.match !== m) return;
       m.finished = true;
       m.results = final.results || final.players || data.results || [];
       m.answers = final.answers || [];
       clearInterval(pollTimer);
       clearInterval(gameTimer);
-      await refreshUser();
-      render();
+      try {
+        await refreshUser();
+      } finally {
+        if (state.match === m) render();
+      }
       return;
     }
     const changed = m.index !== index || initial;
     m.index = index;
     m.currentWord = data.challenge?.word;
     m.answered =
-      m.players.find((p) => p.id === state.user?.id)?.answered_current || false;
+      m.acceptedIndex === index ||
+      m.players.find((p) => p.id === state.user?.id)?.answered_current ||
+      false;
     if (changed) {
       render();
       if (m.currentWord) {
@@ -844,10 +873,11 @@ async function pollMatch(initial = false) {
       }
     }
   } catch (error) {
+    if (state.match !== m) return;
     if (initial) throw error;
     toast("Связь с матчем: " + error.message);
   } finally {
-    polling = false;
+    m.polling = false;
   }
 }
 function tickOnline() {
