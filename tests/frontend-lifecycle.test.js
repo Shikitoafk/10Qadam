@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { t } from "../src/i18n.js";
 
 // Exercise the production asynchronous handlers with delayed RPCs, without a
 // browser, a Supabase account or copies of the application logic.
@@ -41,6 +42,7 @@ function harness(functions, online = {}) {
   };
   const feedback = { className: "", textContent: "" };
   const context = {
+    t,
     online,
     state: {
       mode: "duel",
@@ -137,6 +139,21 @@ function matchState(overrides = {}) {
     ...overrides,
   };
 }
+
+test("initial auth refresh does not replace a practice game started during loading", async () => {
+  const auth = deferred();
+  const { context: c } = harness(["initialize"], {
+    isOnlineConfigured: true,
+    onAuthStateChange() {},
+  });
+  c.refreshUser = () => auth.promise;
+  const loading = c.initialize();
+  assert.equal(c.renders, 1, "the arena is available without waiting for auth");
+  c.state.page = "game";
+  auth.resolve();
+  await loading;
+  assert.equal(c.renders, 1, "a live answer input is not recreated by late auth");
+});
 
 test("completed results still render when refreshing the profile fails", async () => {
   const { context: c } = harness(["pollMatch"], {
