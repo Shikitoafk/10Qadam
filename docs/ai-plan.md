@@ -4,7 +4,7 @@
 
 ## Configuration
 
-Set **server-only** `GEMINI_API_KEY` in Vercel and redeploy. Never use a `VITE_` prefix for this secret or commit it. Optional `GEMINI_MODEL` defaults to the stable `gemini-2.5-flash`. The function uses `SUPABASE_URL` / `SUPABASE_ANON_KEY` or the existing `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. These Supabase public keys are not Gemini secrets. No service-role key is used.
+Set **server-only** `GEMINI_API_KEY` in Vercel and redeploy. Never use a `VITE_` prefix for this secret or commit it. Optional `GEMINI_MODEL` defaults to the stable `gemini-3.5-flash-lite` with minimal thinking. Google restricts the older 2.5 models to existing active users; new projects can receive `404 NOT_FOUND` for them. An explicit legacy 2.5 override retains budget-based thinking. The function uses `SUPABASE_URL` / `SUPABASE_ANON_KEY` or the existing `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. These Supabase public keys are not Gemini secrets. No service-role key is used.
 
 The `consume_plan_quota()` Supabase RPC must be deployed. It runs as the signed-in user, derives their identity from `auth.uid()`, atomically reserves one attempt, and returns a JSON boolean. The endpoint fails closed if the RPC is unavailable. The limit is three attempts per user per UTC day plus the site's shared daily limit; attempts which reach the model can count even when it fails. This is an application safety limit, not a guarantee of free provider usage. Google quotas/pricing/billing settings still apply. API keys and model availability must be managed in the owner's Google project.
 
@@ -27,7 +27,9 @@ Only a validated completed plan and activity checkmarks are saved in browser loc
 
 ## Official references checked 2026-10-14
 
-- [Gemini 2.5 Flash stable model](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)
+- [Gemini 3.5 Flash-Lite stable model](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)
+- [Model availability and legacy restrictions](https://ai.google.dev/gemini-api/docs/models)
+- [Thinking controls](https://ai.google.dev/gemini-api/docs/thinking)
 - [Structured output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
 - [GenerateContent API reference](https://ai.google.dev/api/generate-content) (`responseMimeType` and `responseJsonSchema` aliases remain supported for the stable model; model output is independently revalidated)
 - [Server-side key handling](https://ai.google.dev/gemini-api/docs/api-key)

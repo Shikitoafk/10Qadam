@@ -219,13 +219,16 @@ test("success passes only explicit preferences to Gemini and keeps server key in
   const google = h.calls[2];
   assert.equal(
     google.url,
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
   );
   assert.equal(google.headers["x-goog-api-key"], env.GEMINI_API_KEY);
   assert.equal(google.headers.Authorization, undefined);
   const request = JSON.parse(google.body);
   assert.equal(request.generationConfig.responseMimeType, "application/json");
   assert.equal(request.generationConfig.maxOutputTokens, 5000);
+  assert.deepEqual(request.generationConfig.thinkingConfig, {
+    thinkingLevel: "MINIMAL",
+  });
   assert.equal(
     request.generationConfig.responseJsonSchema.properties.days.maxItems,
     7,
@@ -235,6 +238,15 @@ test("success passes only explicit preferences to Gemini and keeps server key in
   assert.equal(learner.preferences, payload.preferences);
   assert.equal(learner.id, undefined);
   assert.ok(!JSON.stringify(h.res.data).includes(env.GEMINI_API_KEY));
+});
+test("explicit legacy model override retains budget-based thinking configuration", async () => {
+  const h = harness({ env: { ...env, GEMINI_MODEL: "gemini-2.5-flash" } });
+  await h.run();
+  assert.equal(h.res.code, 200);
+  assert.match(h.calls[2].url, /\/gemini-2\.5-flash:generateContent$/);
+  assert.deepEqual(JSON.parse(h.calls[2].body).generationConfig.thinkingConfig, {
+    thinkingBudget: 0,
+  });
 });
 test("upstream errors are sanitized and invalid or truncated model responses are rejected", async () => {
   const bad = plan();

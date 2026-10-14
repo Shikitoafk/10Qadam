@@ -160,7 +160,7 @@ export function createPlanHandler({
     }
     if (!input) return reply(400, "invalid_request");
     const key = env.GEMINI_API_KEY?.trim();
-    const model = env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    const model = env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
     const supabase = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
     const publicKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY;
     if (!key) return reply(503, "ai_not_configured");
@@ -267,7 +267,12 @@ export function createPlanHandler({
             generationConfig: {
               temperature: 0.5,
               maxOutputTokens: 5000,
-              thinkingConfig: { thinkingBudget: 0 },
+              // Gemini 3 uses thinking levels; keep legacy overrides compatible.
+              ...(model === "gemini-3.5-flash-lite"
+                ? { thinkingConfig: { thinkingLevel: "MINIMAL" } }
+                : model.startsWith("gemini-2.5-")
+                  ? { thinkingConfig: { thinkingBudget: 0 } }
+                  : {}),
               responseMimeType: "application/json",
               responseJsonSchema: PLAN_SCHEMA,
             },
