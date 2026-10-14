@@ -717,6 +717,7 @@ footer .icon {
   background: #e1edf7;
   padding: 4px;
   display: flex;
+  flex-wrap: wrap;
   border-radius: 7px;
   gap: 3px;
 }
@@ -732,6 +733,12 @@ footer .icon {
   color: var(--ink);
   background: #fafdff;
   box-shadow: 0 1px 4px #3333330a;
+}
+@media (max-width: 720px) {
+  .mode-section > .section-heading,
+  .simple-intro + .section-heading {
+    flex-wrap: wrap;
+  }
 }
 .mode-grid {
   display: grid;

@@ -111,10 +111,10 @@ export const STUDY_COPY = {
     "Напиши короткое предложение и увидь, что стоит подтянуть.",
   ],
   "Put it into play": ["Put it into play", "Ойында сына", "Проверь в игре"],
-  "Ready for a challenge? Join an A1 or A2 spelling match.": [
-    "Ready for a challenge? Join an A1 or A2 spelling match.",
-    "Жарысқа дайынсың ба? A1 не A2 матчына қатыс.",
-    "Готов к соревнованию? Присоединяйся к матчу A1 или A2.",
+  "Ready for a challenge? Join a spelling match at your level, A1 to C1.": [
+    "Ready for a challenge? Join a spelling match at your level, A1 to C1.",
+    "Жарысқа дайынсың ба? A1–C1 аралығындағы өз деңгейіңде ойна.",
+    "Готов к соревнованию? Играй на своём уровне от A1 до C1.",
   ],
   "Go to the arena": ["Go to the arena", "Аренаға өту", "На арену"],
   "HOW IT WORKS": ["HOW IT WORKS", "ҚАЛАЙ ЖҰМЫС ІСТЕЙДІ", "КАК ЭТО РАБОТАЕТ"],

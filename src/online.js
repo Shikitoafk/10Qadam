@@ -97,7 +97,9 @@ export async function getProfile() {
   return unwrap(
     requireClient()
       .from("profiles")
-      .select("id,username,rating_a1,rating_a2,games,wins,created_at")
+      .select(
+        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,games,wins,created_at",
+      )
       .eq("id", session.user.id)
       .single(),
   );
@@ -110,18 +112,22 @@ export function updateProfile(username) {
 }
 
 export function getLeaderboard(level = "A1", limit = 10) {
+  validateLearningLevel(level);
   return unwrap(
     requireClient()
       .from("profiles")
-      .select("id,username,rating_a1,rating_a2,games,wins")
+      .select(
+        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,games,wins",
+      )
       .gt("games", 0)
-      .order(level === "A2" ? "rating_a2" : "rating_a1", { ascending: false })
+      .order(`rating_${level.toLowerCase()}`, { ascending: false })
       .order("username", { ascending: true })
       .limit(Math.max(1, Math.min(100, limit))),
   );
 }
 
 export function joinQueue(mode = "duel", level = "A1") {
+  validateLearningLevel(level);
   return unwrap(
     requireClient().rpc("join_matchmaking", { p_mode: mode, p_level: level }),
   );

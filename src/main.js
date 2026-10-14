@@ -141,6 +141,7 @@ try {
 }
 study.setLevel(selectedStudyLevel || "A1");
 state.wordLevel = study.getLevel();
+state.level = study.getLevel();
 let pendingPage = "arena";
 
 function syncRoute(page, replace = false) {
@@ -222,7 +223,7 @@ function render() {
       t(
         state.page === "welcome" || state.page === "study"
           ? "Start English at your level, A1 to C1. Learn with flashcards and sentence dictation, then join the spelling arena."
-          : "Listen, spell and compete. English A1/A2 practice, duels and four-player battles.",
+          : "Listen, spell and compete. English A1–C1 practice, duels and four-player battles.",
         state.language,
       ),
     );
@@ -230,9 +231,7 @@ function render() {
 }
 function rating() {
   const p = state.profile;
-  return p
-    ? ((state.level === "A1" ? p.rating_a1 : p.rating_a2) ?? 1000)
-    : null;
+  return p ? (p[`rating_${state.level.toLowerCase()}`] ?? 1000) : null;
 }
 function learningShortcut() {
   if (accountLearningLevel(state.user)) return renderLearningPreference();
@@ -259,7 +258,7 @@ function renderWelcome() {
     [
       "03",
       "Put it into play",
-      "Ready for a challenge? Join an A1 or A2 spelling match.",
+      "Ready for a challenge? Join a spelling match at your level, A1 to C1.",
     ],
   ]
     .map(
@@ -271,9 +270,9 @@ function renderWelcome() {
 function renderArena() {
   const personal = state.history;
   return `<section class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> <span data-no-i18n>10QADAM —</span></div><h1 data-no-i18n>${slogan(state.language)[0]}<br><span class="underlined">${slogan(state.language)[1]}</span></h1><p>Английский на слух. Баттлы на скорость.<br>Десять слов, чтобы стать чуть лучше.</p></div><div class="intro-stamp"><span>LISTEN</span><span class="stamp-cross">×</span><span>TYPE</span><span class="stamp-cross">×</span><span>WIN</span><i>↗</i></div></section>
-  <section class="hero-arena" aria-label="Соревнование по spelling"><div class="hero-copy"><span class="pill">${icons.bolt} ТВОЯ СЛЕДУЮЩАЯ ПОБЕДА</span><h2>Включай звук.<br>Выключай сомнения.</h2><p>Слово прозвучало. Таймер пошёл.<br>Кто напишет правильно первым?</p><button class="button light" data-action="quick-play">Выйти на арену ${icons.arrow}</button><div class="hero-meta"><span>10 СЛОВ</span><i></i><span>12 СЕК / СЛОВО</span><i></i><span>A1 — A2</span></div></div><div class="hero-visual" aria-hidden="true"><div class="visual-grid"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="floating-label">EVERY LETTER COUNTS</span><div class="letter-tile tile-s">S<span>01</span></div><div class="letter-tile tile-p">P<span>02</span></div><div class="letter-tile tile-e">E<span>03</span></div><div class="letter-tile tile-l">L<span>04</span></div><div class="letter-tile tile-l2">L<span>05</span></div><div class="visual-score"><span class="score-check">${icons.check}</span><div>THAT'S CORRECT.<small>+100 accuracy &nbsp; +42 speed</small></div></div><div class="visual-corner">01:24 <span>● REC</span></div></div></section>
+  <section class="hero-arena" aria-label="Соревнование по spelling"><div class="hero-copy"><span class="pill">${icons.bolt} ТВОЯ СЛЕДУЮЩАЯ ПОБЕДА</span><h2>Включай звук.<br>Выключай сомнения.</h2><p>Слово прозвучало. Таймер пошёл.<br>Кто напишет правильно первым?</p><button class="button light" data-action="quick-play">Выйти на арену ${icons.arrow}</button><div class="hero-meta"><span>10 СЛОВ</span><i></i><span>12 СЕК / СЛОВО</span><i></i><span>A1 — C1</span></div></div><div class="hero-visual" aria-hidden="true"><div class="visual-grid"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="floating-label">EVERY LETTER COUNTS</span><div class="letter-tile tile-s">S<span>01</span></div><div class="letter-tile tile-p">P<span>02</span></div><div class="letter-tile tile-e">E<span>03</span></div><div class="letter-tile tile-l">L<span>04</span></div><div class="letter-tile tile-l2">L<span>05</span></div><div class="visual-score"><span class="score-check">${icons.check}</span><div>THAT'S CORRECT.<small>+100 accuracy &nbsp; +42 speed</small></div></div><div class="visual-corner">01:24 <span>● REC</span></div></div></section>
   ${learningShortcut()}
-  <section class="mode-section"><div class="section-heading"><div><span class="eyebrow small">PICK YOUR BATTLE</span><h2>Как играем?</h2></div><div class="level-select" aria-label="Уровень английского"><span>Уровень слов</span><div role="group">${["A1", "A2"].map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}" aria-pressed="${state.level === l}">${l}</button>`).join("")}</div></div></div><div class="mode-grid">${Object.entries(
+  <section class="mode-section"><div class="section-heading"><div><span class="eyebrow small">PICK YOUR BATTLE</span><h2>Как играем?</h2></div><div class="level-select" aria-label="Уровень английского"><span>Уровень слов</span><div role="group">${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}" aria-pressed="${state.level === l}">${l}</button>`).join("")}</div></div></div><div class="mode-grid">${Object.entries(
     modes,
   )
     .map(
@@ -286,14 +285,14 @@ function renderArena() {
   <section class="bottom-section"><div class="how-block"><div class="section-heading"><h2>Три шага к победе</h2><button class="text-link" data-action="rules">Правила ${icons.arrow}</button></div><div class="steps"><div><b>01</b>${icons.sound}<h3>Слушай</h3><p>Слово звучит на английском.<br>Можно послушать ещё раз.</p></div><div><b>02</b>${icons.bolt}<h3>Пиши</h3><p>Введи слово и нажми Enter.<br>Точность важнее скорости.</p></div><div><b>03</b>${icons.trophy}<h3>Забирай очки</h3><p>Правильный ответ — 100 очков.<br>Скорость — до 50 сверху.</p></div></div></div><aside class="progress-note"><span class="eyebrow small">YOUR PERSONAL BEST</span><h3>${personal.length ? Math.max(...personal.map((x) => x.score)) : "—"}<span>очков</span></h3><p>${personal.length ? `Ты уже завершил ${personal.length} тренировок. Следующий рекорд рядом.` : "Первая тренировка — начало твоей истории. Сделаем первый шаг?"}</p><button class="text-link" data-action="solo">В соло ${icons.arrow}</button></aside></section>`;
 }
 function renderLeaders() {
-  return `<section class="simple-intro"><span class="eyebrow">THE SPELLING CLUB</span><h1>Таблица <span class="underlined">лидеров.</span></h1><p>Правильные слова. Заслуженные победы.</p></section><div class="section-heading"><h2>Рейтинг ${state.level}</h2><div class="level-select"><div>${["A1", "A2"].map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><div class="leader-table"><div class="leader-row heading"><span>МЕСТО</span><span>ИГРОК</span><span>РЕЙТИНГ</span></div>${state.leaderLoading ? '<div class="empty-state">Загружаем рейтинг…</div>' : state.leaderboard.length ? state.leaderboard.map((p, i) => `<div class="leader-row"><span class="leader-place">${String(i + 1).padStart(2, "0")}</span><span class="leader-player">${avatar(p.username)}<span data-no-i18n>${escape(p.username)}</span>${p.id === state.user?.id ? "<small>ТЫ</small>" : ""}</span><strong>${escape(p.rating ?? p[`rating_${state.level.toLowerCase()}`] ?? 1000)}</strong></div>`).join("") : `<div class="empty-state">${icons.trophy}<h3>${online.isOnlineConfigured ? "Лидеры ещё не появились" : "Здесь будут настоящие игроки"}</h3><p>${online.isOnlineConfigured ? "Заверши первый рейтинговый матч и займи своё место." : "Таблица заработает после подключения Supabase. А пока можно поставить личный рекорд в соло."}</p><button class="button dark" data-action="solo">Играть соло ${icons.arrow}</button></div>`}</div>`;
+  return `<section class="simple-intro"><span class="eyebrow">THE SPELLING CLUB</span><h1>Таблица <span class="underlined">лидеров.</span></h1><p>Правильные слова. Заслуженные победы.</p></section><div class="section-heading"><h2>Рейтинг ${state.level}</h2><div class="level-select"><div>${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><div class="leader-table"><div class="leader-row heading"><span>МЕСТО</span><span>ИГРОК</span><span>РЕЙТИНГ</span></div>${state.leaderLoading ? '<div class="empty-state">Загружаем рейтинг…</div>' : state.leaderboard.length ? state.leaderboard.map((p, i) => `<div class="leader-row"><span class="leader-place">${String(i + 1).padStart(2, "0")}</span><span class="leader-player">${avatar(p.username)}<span data-no-i18n>${escape(p.username)}</span>${p.id === state.user?.id ? "<small>ТЫ</small>" : ""}</span><strong>${escape(p.rating ?? p[`rating_${state.level.toLowerCase()}`] ?? 1000)}</strong></div>`).join("") : `<div class="empty-state">${icons.trophy}<h3>${online.isOnlineConfigured ? "Лидеры ещё не появились" : "Здесь будут настоящие игроки"}</h3><p>${online.isOnlineConfigured ? "Заверши первый рейтинговый матч и займи своё место." : "Таблица заработает после подключения Supabase. А пока можно поставить личный рекорд в соло."}</p><button class="button dark" data-action="solo">Играть соло ${icons.arrow}</button></div>`}</div>`;
 }
 function renderWords() {
   const tr = (key) => escape(t(key, state.language));
   const total = studyWords(state.wordLevel).length.toLocaleString(
     LOCALES[state.language],
   );
-  return `<div data-no-i18n><section class="simple-intro library-intro"><span class="eyebrow">A1–C1 / ${tr("THE WORD LIBRARY")}</span><h1>${tr("Your word library.")}</h1><p>${tr("Explore words at your level. Hear them, understand them, make them yours.")}</p></section><section class="library-toolbar"><div class="library-levels"><div><strong>${escape(state.wordLevel)} <span>· ${total}</span></strong><small>${tr("entries at this level")}</small></div><div class="library-level-buttons" role="group" aria-label="${tr("Vocabulary level")}">${LEARNING_LEVELS.map((level) => `<button data-word-level="${level}" class="${state.wordLevel === level ? "selected" : ""}" aria-pressed="${state.wordLevel === level}">${level}</button>`).join("")}</div></div><label class="search-field">${icons.book}<input id="word-search" value="${escape(state.wordQuery)}" placeholder="${tr("Search words, definitions or translations…")}" autocomplete="off" aria-label="${tr("Search the word library")}" /></label></section><section id="library-results">${renderWordResults()}</section><aside class="library-note"><p>${tr("Some imported entries have English definitions only. Available Kazakh and Russian translations are shown automatically.")}</p><p>${tr("Reference levels are a learning guide, not a certified assessment. Ranked matches still use the separate A1/A2 arena word lists.")}</p><span class="library-source-names">CEFR-J · Octanove · WordNet</span><a class="library-source-link" href="/vocabulary-sources.html">${tr("Sources & licences")} ↗</a></aside></div>`;
+  return `<div data-no-i18n><section class="simple-intro library-intro"><span class="eyebrow">A1–C1 / ${tr("THE WORD LIBRARY")}</span><h1>${tr("Your word library.")}</h1><p>${tr("Explore words at your level. Hear them, understand them, make them yours.")}</p></section><section class="library-toolbar"><div class="library-levels"><div><strong>${escape(state.wordLevel)} <span>· ${total}</span></strong><small>${tr("entries at this level")}</small></div><div class="library-level-buttons" role="group" aria-label="${tr("Vocabulary level")}">${LEARNING_LEVELS.map((level) => `<button data-word-level="${level}" class="${state.wordLevel === level ? "selected" : ""}" aria-pressed="${state.wordLevel === level}">${level}</button>`).join("")}</div></div><label class="search-field">${icons.book}<input id="word-search" value="${escape(state.wordQuery)}" placeholder="${tr("Search words, definitions or translations…")}" autocomplete="off" aria-label="${tr("Search the word library")}" /></label></section><section id="library-results">${renderWordResults()}</section><aside class="library-note"><p>${tr("Some imported entries have English definitions only. Available Kazakh and Russian translations are shown automatically.")}</p><p>${tr("Reference levels are a learning guide, not a certified assessment. Ranked matches pair players within the same word level, A1 to C1.")}</p><span class="library-source-names">CEFR-J · Octanove · WordNet</span><a class="library-source-link" href="/vocabulary-sources.html">${tr("Sources & licences")} ↗</a></aside></div>`;
 }
 function renderWordResults() {
   const tr = (key) => escape(t(key, state.language));
@@ -331,11 +330,11 @@ function renderLearningPreference() {
   if (!state.user) return "";
   const level = accountLearningLevel(state.user);
   const h = (key) => escape(t(key, state.language));
-  return `<section class="account-learning" data-no-i18n><div><span class="study-kicker">${h("Your English level")}</span><h2>${level || h("Choose your level")}</h2><p>${h("Your account remembers your starting point for learning and the word library.")}</p><small>${h("Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.")}</small></div><div class="account-learning-actions"><button class="button outline" data-action="learning-level">${h(level ? "Change my level" : "Choose your level")}</button>${level ? `<button class="button dark" data-action="my-learning">${h("Continue learning")} ${escape(level)} ${icons.arrow}</button>` : ""}</div></section>`;
+  return `<section class="account-learning" data-no-i18n><div><span class="study-kicker">${h("Your English level")}</span><h2>${level || h("Choose your level")}</h2><p>${h("Your account remembers your starting point for learning and the word library.")}</p><small>${h("Your chosen level sets the word difficulty, not your rating. Each level has its own match rating, starting at 1000.")}</small></div><div class="account-learning-actions"><button class="button outline" data-action="learning-level">${h(level ? "Change my level" : "Choose your level")}</button>${level ? `<button class="button dark" data-action="my-learning">${h("Continue learning")} ${escape(level)} ${icons.arrow}</button>` : ""}</div></section>`;
 }
 function showLearningLevel() {
   modal(
-    `<div data-no-i18n><span class="eyebrow">YOUR STARTING POINT</span><h2>${escape(t("Start where you are.", state.language))}</h2><form id="learning-level-form">${learningLevelField(accountLearningLevel(state.user) || "")}<p class="account-level-note">${escape(t("Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.", state.language))}</p><p class="form-error" role="alert"></p><button type="submit" class="button dark full">${escape(t("Save and start learning", state.language))} ${icons.arrow}</button></form></div>`,
+    `<div data-no-i18n><span class="eyebrow">YOUR STARTING POINT</span><h2>${escape(t("Start where you are.", state.language))}</h2><form id="learning-level-form">${learningLevelField(accountLearningLevel(state.user) || "")}<p class="account-level-note">${escape(t("Your chosen level sets the word difficulty, not your rating. Each level has its own match rating, starting at 1000.", state.language))}</p><p class="form-error" role="alert"></p><button type="submit" class="button dark full">${escape(t("Save and start learning", state.language))} ${icons.arrow}</button></form></div>`,
   );
 }
 function offerLearningLevel() {
@@ -353,13 +352,14 @@ function offerLearningLevel() {
 }
 function applyLearningLevel(level) {
   study.setLevel(level);
+  state.level = level;
   state.wordLevel = level;
   state.wordPage = 1;
   state.wordQuery = "";
 }
 function renderProfile() {
   const history = state.history;
-  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section>${renderLearningPreference()}<div class="stat-grid"><div><span>РЕЙТИНГ A1</span><strong>${state.profile?.rating_a1 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>РЕЙТИНГ A2</span><strong>${state.profile?.rating_a2 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
+  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section>${renderLearningPreference()}<div class="stat-grid">${LEARNING_LEVELS.map((level) => `<div><span>${t("РЕЙТИНГ", state.language)} ${level}</span><strong>${state.profile?.[`rating_${level.toLowerCase()}`] ?? "—"}</strong><small>${t("Дуэли и баттлы", state.language)}</small></div>`).join("")}<div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
     history.length
       ? history
           .slice(0, 10)
@@ -393,7 +393,7 @@ function closeModal() {
 }
 function showRules() {
   modal(
-    `<span class="eyebrow">THE RULES ARE SIMPLE</span><h2>Слушай. Пиши.<br>Побеждай.</h2><div class="rules-list"><p><b>01</b><span>В матче 10 слов. На каждое — 12 секунд. В онлайне все участники получают одинаковую последовательность.</span></p><p><b>02</b><span>Слушай слово, вводи ответ и нажимай Enter. Повторное прослушивание не останавливает таймер.</span></p><p><b>03</b><span>Правильное слово даёт 100 очков. Чем быстрее ответ, тем больше бонус — до 50 очков.</span></p><p><b>04</b><span>Одна попытка на слово. Регистр букв не важен. Побеждает тот, у кого больше верных слов. При равной точности решают очки за скорость; полный равный результат — ничья.</span></p><p><b>05</b><span>A1 и A2 имеют отдельный рейтинг. В соло и демо рейтинг не меняется.</span></p></div><button class="button dark full" data-action="close">Понятно, погнали ${icons.arrow}</button>`,
+    `<span class="eyebrow">THE RULES ARE SIMPLE</span><h2>Слушай. Пиши.<br>Побеждай.</h2><div class="rules-list"><p><b>01</b><span>В матче 10 слов. На каждое — 12 секунд. В онлайне все участники получают одинаковую последовательность.</span></p><p><b>02</b><span>Слушай слово, вводи ответ и нажимай Enter. Повторное прослушивание не останавливает таймер.</span></p><p><b>03</b><span>Правильное слово даёт 100 очков. Чем быстрее ответ, тем больше бонус — до 50 очков.</span></p><p><b>04</b><span>Одна попытка на слово. Регистр букв не важен. Побеждает тот, у кого больше верных слов. При равной точности решают очки за скорость; полный равный результат — ничья.</span></p><p><b>05</b><span>У каждого уровня A1–C1 отдельный рейтинг. В соло и демо рейтинг не меняется.</span></p></div><button class="button dark full" data-action="close">Понятно, погнали ${icons.arrow}</button>`,
   );
 }
 function showAuth(signup = false) {
@@ -494,7 +494,7 @@ document.addEventListener("click", async (event) => {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  if (el.dataset.level) {
+  if (LEARNING_LEVELS.includes(el.dataset.level)) {
     state.level = el.dataset.level;
     render();
     if (state.page === "leaders") fetchLeaders();
@@ -682,12 +682,14 @@ async function refreshUser({ preserveLevel = false } = {}) {
   const level = accountLearningLevel(state.user);
   if (
     level &&
-    !preserveLevel &&
     (previousUser?.id !== state.user.id ||
       accountLearningLevel(previousUser) !== level)
   ) {
-    applyLearningLevel(level);
-    if (state.page === "study") syncRoute("study", true);
+    state.level = level;
+    if (!preserveLevel) {
+      applyLearningLevel(level);
+      if (state.page === "study") syncRoute("study", true);
+    }
   }
   state.profile = state.user ? await online.getProfile() : null;
 }

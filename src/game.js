@@ -1,3 +1,5 @@
+import importedWords from "./data/cefr-words.json" with { type: "json" };
+
 export const ROUND_COUNT = 10;
 export const ROUND_SECONDS = 12;
 export const WORDS = {
@@ -106,6 +108,54 @@ export const WORDS = {
     ["environment", "окружающая среда"],
   ],
 };
+
+// Keep the original beginner banks stable: study translations also use WORDS.
+// Advanced spelling rounds use single words from their actual source CEFR band.
+// Match the conservative gameplay subset used by the ranked seed generator.
+const excludedGameplayWords = new Set([
+  "aborigine",
+  "gypsy",
+  "hiv",
+  "lust",
+  "ness",
+  "pee",
+  "prick",
+  "queer",
+  "rape",
+  "raunchy",
+  "retard",
+  "sex",
+  "sexual",
+  "sexy",
+  "suicide",
+]);
+const advancedWords = Object.fromEntries(
+  ["B1", "B2", "C1"].map((level) => [
+    level,
+    importedWords
+      .filter(
+        ([word, , band, definition, source]) =>
+          band === level &&
+          /^(cefrj|octanove)$/.test(source) &&
+          /^[a-z]{3,18}$/.test(word) &&
+          !excludedGameplayWords.has(word) &&
+          typeof definition === "string" &&
+          definition.length > 0,
+      )
+      .map(([word, , , definition]) => [word, definition]),
+  ]),
+);
+const practiceLevels = new Set(["A1", "A2", "B1", "B2", "C1"]);
+
+function validPractice(result) {
+  return (
+    result &&
+    typeof result.score === "number" &&
+    Number.isFinite(result.score) &&
+    (result.level === undefined || practiceLevels.has(result.level))
+  );
+}
+
 export function normalizeAnswer(value) {
   return String(value).trim().toLowerCase();
 }
@@ -122,7 +172,11 @@ export function scoreAnswer(answer, target, elapsedMs) {
   };
 }
 export function makeDeck(level, random = Math.random) {
-  const items = [...(WORDS[level] || WORDS.A1)];
+  const items = [
+    ...(practiceLevels.has(level)
+      ? WORDS[level] || advancedWords[level]
+      : WORDS.A1),
+  ];
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [items[i], items[j]] = [items[j], items[i]];
@@ -142,14 +196,13 @@ export function loadPractice() {
     const data = JSON.parse(
       localStorage.getItem("spell-arena-practice") || "[]",
     );
-    return Array.isArray(data)
-      ? data.filter((x) => x && typeof x.score === "number").slice(0, 30)
-      : [];
+    return Array.isArray(data) ? data.filter(validPractice).slice(0, 30) : [];
   } catch {
     return [];
   }
 }
 export function savePractice(result) {
+  if (!validPractice(result)) return;
   try {
     localStorage.setItem(
       "spell-arena-practice",

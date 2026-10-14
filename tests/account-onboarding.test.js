@@ -62,12 +62,12 @@ function harness() {
   return context;
 }
 
-test("C1 sign-in restores learning and word-library defaults without altering arena rating bands", async () => {
+test("C1 sign-in restores learning, word-library and arena defaults", async () => {
   const c = harness();
   await c.refreshUser();
   assert.equal(c.study.level, "C1");
   assert.equal(c.state.wordLevel, "C1");
-  assert.equal(c.state.level, "A1");
+  assert.equal(c.state.level, "C1");
   c.study.level = "B2";
   await c.refreshUser();
   assert.equal(
@@ -126,7 +126,7 @@ test("signup and profile expose all five levels with truthful localized learning
     c.state.user = user("one", "C1");
     const profile = c.renderLearningPreference();
     assert.match(profile, /C1/);
-    assert.match(profile, /A1\/A2/);
+    assert.match(profile, /1000/);
     assert.ok(profile.includes(t("Change my level", language)));
   }
 });

@@ -26,15 +26,15 @@ export const ACCOUNT_COPY = {
     ],
   "Your account remembers your starting point for learning and the word library.":
     [
-      "Your account remembers your starting point for learning and the word library.",
-      "Аккаунтың оқу мен сөздікке арналған деңгейіңді есте сақтайды.",
-      "Аккаунт запоминает твой стартовый уровень для обучения и словаря.",
+      "Your account remembers your starting level for learning, the word library and battles.",
+      "Аккаунтың оқу, сөздік және ойындарға арналған бастапқы деңгейіңді есте сақтайды.",
+      "Аккаунт запоминает стартовый уровень для обучения, словаря и баттлов.",
     ],
-  "Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.":
+  "Your chosen level sets the word difficulty, not your rating. Each level has its own match rating, starting at 1000.":
     [
-      "Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.",
-      "Бұл — өзің таңдаған оқу деңгейі, тест нәтижесі немесе ойын рейтингі емес. Рейтингтік ойындарда әзірге тек A1/A2 бар.",
-      "Это выбранный тобой уровень обучения, не результат теста и не рейтинг. Рейтинговые баттлы пока доступны только для A1/A2.",
+      "Your chosen level sets the word difficulty, not your rating. Each level has its own match rating, starting at 1000.",
+      "Таңдаған деңгейің сөздердің қиындығын анықтайды, рейтингіңді емес. Әр деңгейдің жеке ойын рейтингі 1000-нан басталады.",
+      "Выбранный уровень задаёт сложность слов, а не рейтинг. У каждого уровня свой игровой рейтинг со стартом в 1000.",
     ],
   "Change my level": [
     "Change my level",

@@ -61,10 +61,10 @@ export const LIBRARY_COPY = {
     "Дереккөздер мен лицензиялар",
     "Источники и лицензии",
   ],
-  "Reference levels are a learning guide, not a certified assessment. Ranked matches still use the separate A1/A2 arena word lists.":
+  "Reference levels are a learning guide, not a certified assessment. Ranked matches pair players within the same word level, A1 to C1.":
     [
-      "Reference levels are a learning guide, not a certified assessment. Ranked matches still use the separate A1/A2 arena word lists.",
-      "Деңгейлер — оқу бағдары, ресми бағалау емес. Рейтингтік ойындарда аренаның бөлек A1/A2 сөз тізімдері қолданылады.",
-      "Уровни служат учебным ориентиром, а не официальной оценкой. В рейтинговых матчах остаются отдельные словари арены A1/A2.",
+      "Reference levels are a learning guide, not a certified assessment. Ranked matches pair players within the same word level, A1 to C1.",
+      "Деңгейлер — оқу бағдары, ресми бағалау емес. Рейтингтік ойындарда A1–C1 аралығындағы бірдей сөз деңгейін таңдаған ойыншылар кездеседі.",
+      "Уровни — учебный ориентир, не официальная оценка. В рейтинговых матчах встречаются игроки на одном уровне слов, от A1 до C1.",
     ],
 };
