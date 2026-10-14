@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
+import { readFileSync } from "node:fs";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -35,6 +36,19 @@ export default defineConfig(({ mode }) => {
             : [];
         },
         generateBundle() {
+          for (const [input, output] of [
+            ["cefr-words.json", "cefr-vocabulary.json"],
+            ["cefr-metadata.json", "cefr-metadata.json"],
+          ]) {
+            this.emitFile({
+              type: "asset",
+              fileName: `data/${output}`,
+              source: readFileSync(
+                new URL(`./src/data/${input}`, import.meta.url),
+                "utf8",
+              ),
+            });
+          }
           if (!origin) return;
           this.emitFile({
             type: "asset",

@@ -1,5 +1,6 @@
 import { WORDS } from "./game.js";
 import { wordMeaning } from "./vocabulary.js";
+import importedWords from "./data/cefr-words.json" with { type: "json" };
 
 export const STUDY_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 export const DICTATION_SECONDS = 35;
@@ -706,7 +707,7 @@ const advancedWords = {
   ],
 };
 
-export function studyWords(level) {
+function curatedWords(level) {
   if (advancedWords[level]) {
     return advancedWords[level].map(([word, en, kk, ru]) => ({
       word,
@@ -720,6 +721,44 @@ export function studyWords(level) {
     en: wordMeaning(word, "en"),
     kk: wordMeaning(word, "kk"),
     ru,
+  }));
+}
+
+// A headword has one study level, even when its source lists several parts of
+// speech. Source CEFR bands supersede the small original hand-picked decks;
+// their translations remain available wherever the headword now belongs.
+const curatedByWord = new Map(
+  STUDY_LEVELS.flatMap((level) =>
+    curatedWords(level).map((entry) => [entry.word, { ...entry, level }]),
+  ),
+);
+const catalogByLevel = Object.fromEntries(
+  STUDY_LEVELS.map((level) => [level, []]),
+);
+const importedHeadwords = new Set();
+for (const [word, pos, level, definition, source] of importedWords) {
+  if (!STUDY_LEVELS.includes(level) || importedHeadwords.has(word)) continue;
+  importedHeadwords.add(word);
+  const curated = curatedByWord.get(word);
+  catalogByLevel[level].push({
+    word,
+    en: curated?.en || definition,
+    kk: curated?.kk || "",
+    ru: curated?.ru || "",
+    pos,
+    source,
+  });
+}
+for (const { level, ...entry } of curatedByWord.values()) {
+  if (!importedHeadwords.has(entry.word)) {
+    catalogByLevel[level].push({ ...entry, pos: "", source: "10qadam" });
+  }
+}
+
+export function studyWords(level) {
+  const selected = STUDY_LEVELS.includes(level) ? level : "A1";
+  return catalogByLevel[selected].map((entry) => ({
+    ...entry,
   }));
 }
 
@@ -815,7 +854,7 @@ function cleanStudy(data) {
             .map((word) => word.trim().toLowerCase())
             .filter((word) => wordBank.has(word)),
         ),
-      ].slice(0, 300)
+      ].slice(0, 20000)
     : [];
   const result = { known };
   const last = data?.lastSession;

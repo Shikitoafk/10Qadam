@@ -1,0 +1,49 @@
+{
+  "format": "Each row: [headword, partOfSpeech, CEFR, EnglishDefinition, levelSource]",
+  "importedOn": "2026-10-14",
+  "total": 7579,
+  "levels": {
+    "A1": 926,
+    "A2": 1225,
+    "B1": 2120,
+    "B2": 2424,
+    "C1": 884
+  },
+  "normalization": "Alternative spellings expanded; duplicate headwords merged at the lowest supported source band; WordNet first indexed sense matched by POS; entries without a definition and C2 omitted. No fabricated translations or CEFR labels.",
+  "sources": [
+    {
+      "id": "cefrj",
+      "title": "The CEFR-J Wordlist Version 1.5",
+      "creator": "Yukio Tono / Tono Laboratory, Tokyo University of Foreign Studies",
+      "url": "https://github.com/openlanguageprofiles/olp-en-cefrj",
+      "file": "cefrj-vocabulary-profile-1.5.csv",
+      "sha256": "b0dd3c635f1c9a4fdf1490c7e5b7c48e8bbe55b652ad0c9860a95f98e10ae498",
+      "terms": "Research and commercial use without charge with proper citation; upstream copyright and disclaimer retained in public/licenses/CEFR-J-NOTICE.md."
+    },
+    {
+      "id": "octanove",
+      "title": "Octanove Vocabulary Profile C1/C2 Version 1.0 (C1 subset)",
+      "creator": "Octanove Labs",
+      "url": "https://github.com/openlanguageprofiles/olp-en-cefrj",
+      "file": "octanove-vocabulary-profile-c1c2-1.0.csv",
+      "sha256": "18c33a407f2f89f7b8de9671c6d45fe3ea0bce45e7d2d7dcaab48d73e0f7b380",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "id": "wordnet",
+      "title": "WordNet 3.0",
+      "creator": "Princeton University",
+      "url": "https://wordnet.princeton.edu/",
+      "archive": "https://wordnetcode.princeton.edu/3.0/WordNet-3.0.tar.gz",
+      "sha256": "640db279c949a88f61f851dd54ebbb22d003f8b90b85267042ef85a3781d3a52",
+      "terms": "WordNet 3.0 license, retained in public/licenses/WORDNET-LICENSE.txt. English definitions only; CEFR bands come from the other sources, not WordNet."
+    }
+  ],
+  "adaptationLicense": "Our adapted catalog arrangement is CC-BY-SA-4.0; underlying CEFR-J and WordNet notices remain applicable. This does not relicense application code or separately curated translations.",
+  "exclusions": {
+    "unsupported-part-of-speech": 319,
+    "unsupported-headword": 11,
+    "no-matching-WordNet-definition": 207
+  }
+}

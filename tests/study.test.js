@@ -13,6 +13,8 @@ import {
   saveStudy,
 } from "../src/study.js";
 import { WORDS } from "../src/game.js";
+import { wordMeaning } from "../src/vocabulary.js";
+import importedWords from "../src/data/cefr-words.json" with { type: "json" };
 
 test("dictation ignores capitalization, punctuation, apostrophes and extra whitespace", () => {
   assert.equal(
@@ -114,14 +116,17 @@ test("each level offers original translated prompts and a unique independent shu
   assert.equal(sentenceDeck("A1", () => NaN, 2).length, 2);
 });
 
-test("all five study levels provide unique words with complete meanings", () => {
+test("all five study levels provide large independent decks with real definitions", () => {
   const allWords = new Set();
   for (const level of STUDY_LEVELS) {
     const words = studyWords(level);
-    assert.equal(words.length, level.startsWith("A") ? 50 : 20);
+    assert.ok(words.length > 100, `${level} has a substantial study deck`);
     for (const entry of words) {
-      assert.ok(entry.word && entry.en && entry.kk && entry.ru);
-      assert.match(entry.word, /^[a-z]+$/);
+      assert.ok(entry.word && entry.en);
+      assert.equal(typeof entry.kk, "string");
+      assert.equal(typeof entry.ru, "string");
+      assert.ok(["cefrj", "octanove", "10qadam"].includes(entry.source));
+      assert.match(entry.word, /^[a-z]+(?:[ '-][a-z]+)*$/);
       assert.doesNotMatch(entry.en, /[А-Яа-яӘәӨөҮүҰұҚқҒғҢңІі]/);
       assert.ok(
         !allWords.has(entry.word),
@@ -133,6 +138,7 @@ test("all five study levels provide unique words with complete meanings", () => 
     assert.notEqual(studyWords(level)[0].word, "changed");
   }
   assert.deepEqual(studyWords("unknown"), studyWords("A1"));
+  assert.deepEqual(studyWords("constructor"), studyWords("A1"));
   const easyLength = SENTENCES.A1.reduce(
     (sum, entry) => sum + entry.text.length,
     0,
@@ -142,6 +148,36 @@ test("all five study levels provide unique words with complete meanings", () => 
     0,
   );
   assert.ok(advancedLength > easyLength * 2);
+});
+
+test("imported CEFR bands take precedence while curated translations follow their headwords", () => {
+  const byWord = new Map(
+    STUDY_LEVELS.flatMap((level) =>
+      studyWords(level).map((entry) => [entry.word, { ...entry, level }]),
+    ),
+  );
+  assert.ok(importedWords.length > 1000);
+  for (const [word, pos, level, definition, source] of importedWords) {
+    const entry = byWord.get(word);
+    assert.equal(entry.level, level, `${word} retains its source CEFR band`);
+    assert.equal(entry.pos, pos);
+    assert.equal(entry.source, source);
+    assert.ok(definition.trim());
+  }
+  for (const [word, ru] of Object.values(WORDS).flat()) {
+    const entry = byWord.get(word);
+    assert.equal(entry.ru, ru, `${word} retains its Russian meaning`);
+    assert.equal(entry.kk, wordMeaning(word, "kk"));
+    assert.equal(entry.en, wordMeaning(word, "en"));
+  }
+  for (const [word, kk, ru] of [
+    ["achieve", "қол жеткізу", "достигать"],
+    ["consequence", "салдар", "последствие"],
+    ["ambiguity", "екіұштылық", "неоднозначность"],
+  ]) {
+    assert.equal(byWord.get(word).kk, kk);
+    assert.equal(byWord.get(word).ru, ru);
+  }
 });
 
 function memoryStorage() {
@@ -189,7 +225,12 @@ test("mastered words and the latest session persist with a small validated shape
   const allLevels = STUDY_LEVELS.flatMap((level) =>
     studyWords(level).map(({ word }) => word),
   );
-  assert.equal(saveStudy({ known: allLevels }, storage).known.length, 160);
+  assert.ok(allLevels.length > 300);
+  assert.equal(
+    saveStudy({ known: [...allLevels, ...allLevels] }, storage).known.length,
+    allLevels.length,
+  );
+  assert.deepEqual(loadStudy(storage).known, allLevels);
 });
 
 test("malformed, unavailable and full storage never interrupt a lesson", () => {

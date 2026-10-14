@@ -1,9 +1,11 @@
 import "./style.css";
 import "./study.css";
+import "./library.css";
 import { createStudyController } from "./study-ui.js";
+import { studyWords } from "./study.js";
+import { libraryPage, libraryMeaning } from "./library.js";
 import { readRoute, pagePath, LEARNING_LEVELS } from "./routes.js";
 import {
-  WORDS,
   makeDeck,
   scoreAnswer,
   loadPractice,
@@ -22,7 +24,7 @@ import {
   LOCALES,
   slogan,
 } from "./i18n.js";
-import { wordMeaning, matchesWord } from "./vocabulary.js";
+import { wordMeaning } from "./vocabulary.js";
 import { speakWord, stopSpeech } from "./speech.js";
 
 const app = document.querySelector("#app");
@@ -72,6 +74,9 @@ const state = {
   page: initialRoute.page,
   language: loadLanguage(),
   level: "A1",
+  wordLevel: "A1",
+  wordQuery: "",
+  wordPage: 1,
   mode: "duel",
   user: null,
   profile: null,
@@ -280,17 +285,32 @@ function renderLeaders() {
   return `<section class="simple-intro"><span class="eyebrow">THE SPELLING CLUB</span><h1>Таблица <span class="underlined">лидеров.</span></h1><p>Правильные слова. Заслуженные победы.</p></section><div class="section-heading"><h2>Рейтинг ${state.level}</h2><div class="level-select"><div>${["A1", "A2"].map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><div class="leader-table"><div class="leader-row heading"><span>МЕСТО</span><span>ИГРОК</span><span>РЕЙТИНГ</span></div>${state.leaderLoading ? '<div class="empty-state">Загружаем рейтинг…</div>' : state.leaderboard.length ? state.leaderboard.map((p, i) => `<div class="leader-row"><span class="leader-place">${String(i + 1).padStart(2, "0")}</span><span class="leader-player">${avatar(p.username)}<span data-no-i18n>${escape(p.username)}</span>${p.id === state.user?.id ? "<small>ТЫ</small>" : ""}</span><strong>${escape(p.rating ?? p[`rating_${state.level.toLowerCase()}`] ?? 1000)}</strong></div>`).join("") : `<div class="empty-state">${icons.trophy}<h3>${online.isOnlineConfigured ? "Лидеры ещё не появились" : "Здесь будут настоящие игроки"}</h3><p>${online.isOnlineConfigured ? "Заверши первый рейтинговый матч и займи своё место." : "Таблица заработает после подключения Supabase. А пока можно поставить личный рекорд в соло."}</p><button class="button dark" data-action="solo">Играть соло ${icons.arrow}</button></div>`}</div>`;
 }
 function renderWords() {
-  return `<section class="simple-intro"><span class="eyebrow">ONE WORD AT A TIME</span><h1>Твой <span class="underlined">словарь.</span></h1><p>Послушай, запомни, попробуй в игре.</p></section><div class="section-heading"><h2>${WORDS[state.level].length} слов · ${state.level}</h2><div class="level-select"><div>${["A1", "A2"].map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><label class="search-field">${icons.book}<input id="word-search" placeholder="Найти слово или перевод…" autocomplete="off" aria-label="Поиск слов" /></label><div class="word-grid" id="word-grid">${wordCards(WORDS[state.level])}</div><p class="vocab-note">Уровни A1/A2 обозначают учебные подборки. Написание слов — британский английский.</p>`;
+  const tr = (key) => escape(t(key, state.language));
+  const total = studyWords(state.wordLevel).length.toLocaleString(
+    LOCALES[state.language],
+  );
+  return `<div data-no-i18n><section class="simple-intro library-intro"><span class="eyebrow">A1–C1 / ${tr("THE WORD LIBRARY")}</span><h1>${tr("Your word library.")}</h1><p>${tr("Explore words at your level. Hear them, understand them, make them yours.")}</p></section><section class="library-toolbar"><div class="library-levels"><div><strong>${escape(state.wordLevel)} <span>· ${total}</span></strong><small>${tr("entries at this level")}</small></div><div class="library-level-buttons" role="group" aria-label="${tr("Vocabulary level")}">${LEARNING_LEVELS.map((level) => `<button data-word-level="${level}" class="${state.wordLevel === level ? "selected" : ""}" aria-pressed="${state.wordLevel === level}">${level}</button>`).join("")}</div></div><label class="search-field">${icons.book}<input id="word-search" value="${escape(state.wordQuery)}" placeholder="${tr("Search words, definitions or translations…")}" autocomplete="off" aria-label="${tr("Search the word library")}" /></label></section><section id="library-results">${renderWordResults()}</section><aside class="library-note"><p>${tr("Some imported entries have English definitions only. Available Kazakh and Russian translations are shown automatically.")}</p><p>${tr("Reference levels are a learning guide, not a certified assessment. Ranked matches still use the separate A1/A2 arena word lists.")}</p><span class="library-source-names">CEFR-J · Octanove · WordNet</span><a class="library-source-link" href="/vocabulary-sources.html">${tr("Sources & licences")} ↗</a></aside></div>`;
+}
+function renderWordResults() {
+  const tr = (key) => escape(t(key, state.language));
+  const result = libraryPage(
+    studyWords(state.wordLevel),
+    state.wordQuery,
+    state.wordPage,
+  );
+  state.wordPage = result.page;
+  const number = (value) => value.toLocaleString(LOCALES[state.language]);
+  return `<div class="library-summary" role="status" aria-live="polite"><span>${tr("Showing")} ${number(result.start)}–${number(result.end)} · ${number(result.filtered)} ${tr("results")}</span><span>${escape(state.wordLevel)}</span></div><div class="word-grid library-grid" id="word-grid">${wordCards(result.items)}</div><nav class="library-pagination" aria-label="${tr("Page")}"><button class="button outline library-previous" data-word-page="${result.page - 1}" ${result.page <= 1 ? "disabled" : ""}>${icons.arrow} ${tr("Previous page")}</button><span class="library-page-number">${tr("Page")} ${number(result.page)} / ${number(result.pages)}</span><button class="button outline" data-word-page="${result.page + 1}" ${result.page >= result.pages ? "disabled" : ""}>${tr("Next page")} ${icons.arrow}</button></nav>`;
 }
 function wordCards(words) {
   return words.length
     ? words
-        .map(
-          ([word]) =>
-            `<div class="word-card"><div><strong data-no-i18n>${escape(word)}</strong><span data-no-i18n>${escape(wordMeaning(word, state.language))}</span></div><button class="icon-button" data-speak="${escape(word)}" aria-label="Послушать ${escape(word)}">${icons.sound}</button></div>`,
-        )
+        .map((entry) => {
+          const meaning = libraryMeaning(entry, state.language);
+          return `<div class="word-card"><div><strong>${escape(entry.word)}</strong>${entry.pos ? `<span class="library-pos">${escape(entry.pos)}</span>` : ""}<span class="library-definition">${escape(meaning.text)}</span>${meaning.fallback ? `<span class="library-fallback">EN · ${escape(t("English definition", state.language))}</span>` : ""}</div><button class="icon-button" data-speak="${escape(entry.word)}" aria-label="${escape(t(`Послушать ${entry.word}`, state.language))}">${icons.sound}</button></div>`;
+        })
         .join("")
-    : '<p class="empty-state">Такого слова пока нет в подборке.</p>';
+    : `<div class="empty-state"><h3>${escape(t("No matching words.", state.language))}</h3><p>${escape(t("Try a shorter search or a different level.", state.language))}</p></div>`;
 }
 function renderProfile() {
   const history = state.history;
@@ -383,13 +403,12 @@ document.addEventListener("change", (event) => {
   }
 });
 
-function renderFilteredWords(query) {
-  const grid = document.querySelector("#word-grid");
-  if (!grid) return;
-  grid.innerHTML = wordCards(
-    WORDS[state.level].filter(([word]) => matchesWord(word, query)),
-  );
-  localize(grid, state.language);
+function renderFilteredWords(query = state.wordQuery, resetPage = false) {
+  const results = document.querySelector("#library-results");
+  if (!results) return;
+  state.wordQuery = query;
+  if (resetPage) state.wordPage = 1;
+  results.innerHTML = renderWordResults();
 }
 
 document.addEventListener("click", async (event) => {
@@ -409,6 +428,20 @@ document.addEventListener("click", async (event) => {
   }
   if (el.dataset.page) {
     navigate(el.dataset.page);
+    return;
+  }
+  if (el.dataset.wordLevel && LEARNING_LEVELS.includes(el.dataset.wordLevel)) {
+    state.wordLevel = el.dataset.wordLevel;
+    state.wordPage = 1;
+    render();
+    return;
+  }
+  if (el.dataset.wordPage) {
+    state.wordPage = Number(el.dataset.wordPage);
+    renderFilteredWords();
+    document
+      .querySelector(".library-toolbar")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
   if (el.dataset.level) {
@@ -481,7 +514,7 @@ document.addEventListener("click", async (event) => {
 document.addEventListener("input", (event) => {
   study.input(event);
   if (event.target.id === "word-search") {
-    renderFilteredWords(event.target.value);
+    renderFilteredWords(event.target.value, true);
   }
 });
 document.addEventListener("submit", async (event) => {

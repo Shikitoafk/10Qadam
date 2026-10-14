@@ -101,15 +101,14 @@ export function createStudyController({
   }
   function renderCards() {
     const words = studyWords(level),
-      knownCount = words.filter((item) =>
-        progress.known.includes(item.word),
-      ).length;
+      known = new Set(progress.known),
+      knownCount = words.filter((item) => known.has(item.word)).length;
     if (!cards)
       return `<section class="study-panel"><span class="study-kicker">${h("Flashcards")} · ${level}</span><h2>${h("A fresh set of ten")}</h2><p>${h("Ten cards. No timer. Just you and your next ten words.")}</p><div class="study-session-stats"><div><span>${h("WORDS REMEMBERED")}</span><strong>${knownCount}<small> / ${words.length}</small></strong></div><p>${h("Saved on this device")}</p></div><div class="study-inline-actions">${button("cards-start", "Start cards", "dark")}${button("cards-unknown", "Practise unknown words")}</div>${knownCount === words.length ? `<p class="study-meta">${h("All words in this level are marked as known. Try a fresh set to keep them sharp.")}</p>` : ""}</section>`;
     if (cards.index >= cards.deck.length)
       return `<section class="study-panel study-summary"><span class="study-kicker">${h("Session complete")}</span><h2>${h("One small session. A real step forward.")}</h2><strong class="study-result-score">${cards.remembered}<small> / ${cards.deck.length}</small></strong><p>${h("remembered this session")}</p><div class="study-inline-actions">${button("cards-start", "Try another set", "dark")}${button("cards-unknown", "Practise unknown words")}</div></section>`;
     const card = cards.deck[cards.index];
-    return `<section class="study-panel"><div class="study-section-heading"><span class="study-kicker">${h("Flashcards")} · ${level}</span><span>${cards.index + 1} / ${cards.deck.length}</span></div><div class="study-progress"><div class="study-progress-fill" style="width:${(cards.index / cards.deck.length) * 100}%"></div></div><button class="study-card" data-study-action="flip" data-side="${cards.revealed ? "back" : "front"}" aria-label="${h("Flip card")}"><span class="study-card-label">${h(cards.revealed ? "MEANING" : "WORD")}</span><strong class="${cards.revealed ? "study-card-meaning" : "study-card-word"}">${escape(cards.revealed ? meaning(card) : card.word)}</strong><span class="study-card-hint">${h(cards.revealed ? "Tap to see the word" : "Tap to reveal the meaning")}</span></button><div class="study-inline-actions">${button("card-hear", "Hear it")}</div><div class="study-card-actions">${button("card-again", "Again", "outline", cards.revealed ? "" : "disabled")}${button("card-known", "I know this", "dark", cards.revealed ? "" : "disabled")}</div></section>`;
+    return `<section class="study-panel"><div class="study-section-heading"><span class="study-kicker">${h("Flashcards")} · ${level}</span><span>${cards.index + 1} / ${cards.deck.length}</span></div><div class="study-progress"><div class="study-progress-fill" style="width:${(cards.index / cards.deck.length) * 100}%"></div></div><button class="study-card" data-study-action="flip" data-side="${cards.revealed ? "back" : "front"}" aria-label="${h("Flip card")}"><span class="study-card-label">${h(cards.revealed ? (language() !== "en" && !card[language()] ? "English definition" : "MEANING") : "WORD")}</span><strong class="${cards.revealed ? "study-card-meaning" : "study-card-word"}">${escape(cards.revealed ? meaning(card) : card.word)}</strong><span class="study-card-hint">${h(cards.revealed ? "Tap to see the word" : "Tap to reveal the meaning")}</span></button><div class="study-inline-actions">${button("card-hear", "Hear it")}</div><div class="study-card-actions">${button("card-again", "Again", "outline", cards.revealed ? "" : "disabled")}${button("card-known", "I know this", "dark", cards.revealed ? "" : "disabled")}</div></section>`;
   }
   function diffMarkup(result) {
     return result.diff
@@ -147,8 +146,8 @@ export function createStudyController({
   }
   function startCards(unknown = false) {
     let pool = studyWords(level);
-    if (unknown)
-      pool = pool.filter((item) => !progress.known.includes(item.word));
+    const known = new Set(progress.known);
+    if (unknown) pool = pool.filter((item) => !known.has(item.word));
     if (!pool.length) {
       cards = null;
       render();

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Vocabulary sources & licences — 10Qadam</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f1f7fc;
+        color: #203449;
+        font:
+          16px/1.75 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 800px;
+        margin: auto;
+        padding: 48px 24px;
+      }
+      a {
+        color: #216b98;
+      }
+      h1,
+      h2 {
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: clamp(28px, 5vw, 44px);
+      }
+      h2 {
+        margin-top: 36px;
+        font-size: 23px;
+      }
+      .note {
+        padding: 18px 22px;
+        background: #dfedf8;
+        border-radius: 12px;
+      }
+      small {
+        color: #486477;
+      }
+      li {
+        margin-bottom: 9px;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/words">← Back to the word bank</a>
+      <h1>Where our words come from.</h1>
+      <p>
+        10Qadam combines open vocabulary profiles with English definitions. The
+        imported collection contains
+        <strong>7,579 distinct headwords and expressions</strong> across A1–C1.
+        Ten additional original 10Qadam entries are retained, making 7,589 study
+        entries in total.
+      </p>
+      <p class="note">
+        These are practice collections, not an official CEFR assessment or
+        complete syllabus. A headword can have several meanings at different
+        levels. The displayed band is its lowest supported band in the source
+        profile; the English definition is not independently CEFR-graded. Some
+        words have English definitions only. Existing Kazakh/Russian
+        translations are retained; missing translations are not generated or
+        presented as verified translations.
+      </p>
+      <h2>CEFR-J: A1, A2, B1 and B2</h2>
+      <p>
+        <cite>The CEFR-J Wordlist Version 1.5</cite>, compiled by Yukio Tono,
+        Tokyo University of Foreign Studies. Copyright belongs to Tono
+        Laboratory at TUFS. Provided through
+        <a href="https://github.com/openlanguageprofiles/olp-en-cefrj"
+          >Open Language Profiles</a
+        >; original project: <a href="https://www.cefr-j.org/">CEFR-J</a>.
+      </p>
+      <p>
+        The publisher permits research and commercial use without charge with
+        proper citation. The original terms and disclaimer are retained in
+        <a href="/licenses/CEFR-J-NOTICE.md">CEFR-J notice</a>. Neither CEFR-J
+        nor Open Language Profiles is responsible for inaccuracies or damage
+        resulting from use.
+      </p>
+      <h2>Octanove: C1</h2>
+      <p>
+        <cite>Octanove Vocabulary Profile C1/C2, Version 1.0</cite>, created by
+        Octanove Labs, from
+        <a
+          href="https://github.com/openlanguageprofiles/olp-en-cefrj/blob/master/octanove-vocabulary-profile-c1c2-1.0.csv"
+          >Open Language Profiles</a
+        >. We use its C1 subset, not C2.
+      </p>
+      <p>
+        Licensed under
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/"
+          >Creative Commons Attribution-ShareAlike 4.0 International</a
+        >
+        (<a href="/licenses/CC-BY-SA-4.0.txt">full licence</a>). Our adapted
+        catalogue arrangement is distributed under the same licence. This does
+        not relicense the application code, separately curated translations, or
+        change the underlying CEFR-J and WordNet conditions.
+      </p>
+      <h2>English definitions: WordNet 3.0</h2>
+      <p>
+        WordNet 3.0 Copyright 2006 by Princeton University. All rights reserved.
+        Used under the
+        <a href="/licenses/WORDNET-LICENSE.txt"
+          >WordNet 3.0 licence, including its full copyright and warranty
+          disclaimer</a
+        >. Source and documentation:
+        <a href="https://wordnet.princeton.edu/">WordNet</a>. It supplies
+        definitions, not CEFR levels.
+      </p>
+      <p>
+        Definitions use the first indexed WordNet sense matching the source part
+        of speech. Where 10Qadam already had a curated definition or
+        translation, that existing content is preserved in the interface. A
+        dictionary sense can be broader or different from the intended
+        learning-profile sense; this is a study aid, not an endorsed learner's
+        dictionary.
+      </p>
+      <h2>What we changed</h2>
+      <ul>
+        <li>
+          Expanded slash-separated spelling variants into separate headwords;
+          normalised whitespace and case.
+        </li>
+        <li>
+          Merged duplicate headwords at their lowest supported source level. A
+          single headword is not counted repeatedly for different parts of
+          speech.
+        </li>
+        <li>
+          Matched definitions by part of speech. Omitted entries with no
+          matching definition, unsupported parts of speech, malformed headwords
+          and C2 entries.
+        </li>
+        <li>
+          Retained the original study sentences, translations and word-game
+          banks separately. Importing this catalogue does not change rated-match
+          scoring or server word banks.
+        </li>
+      </ul>
+      <p>
+        The data is provided as-is without warranties. The source creators do
+        not sponsor or endorse 10Qadam.
+      </p>
+      <h2>Download and provenance</h2>
+      <ul>
+        <li>
+          <a href="/data/cefr-vocabulary.json" download
+            >Adapted vocabulary catalogue (JSON)</a
+          >
+          — rows: headword, part of speech, level, English definition, level
+          source.
+        </li>
+        <li>
+          <a href="/data/cefr-metadata.json"
+            >Source versions, SHA-256 checksums and import counts</a
+          >.
+        </li>
+        <li>
+          <a
+            href="https://github.com/Shikitoafk/10Qadam/blob/main/docs/vocabulary.md"
+            >Import and reproduction instructions</a
+          >.
+        </li>
+      </ul>
+      <small
+        >Imported on 14 October 2026. Sources and licensing are independent of
+        the language selected in the app.</small
+      >
+    </main>
+  </body>
+</html>
