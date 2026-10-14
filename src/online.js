@@ -34,6 +34,11 @@ export async function getSession() {
   return data.session;
 }
 
+export async function getAccessToken() {
+  const session = await getSession();
+  return session?.access_token || null;
+}
+
 export function onAuthStateChange(callback) {
   if (!client) return () => {};
   const { data } = client.auth.onAuthStateChange((_event, session) =>
@@ -98,7 +103,7 @@ export async function getProfile() {
     requireClient()
       .from("profiles")
       .select(
-        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,games,wins,created_at",
+        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,rating_sentence_a1,rating_sentence_a2,rating_sentence_b1,rating_sentence_b2,rating_sentence_c1,games,wins,games_sentence,wins_sentence,created_at",
       )
       .eq("id", session.user.id)
       .single(),
@@ -111,25 +116,36 @@ export function updateProfile(username) {
   );
 }
 
-export function getLeaderboard(level = "A1", limit = 10) {
+export function getLeaderboard(level = "A1", format = "words", limit = 10) {
   validateLearningLevel(level);
+  if (!["words", "sentences"].includes(format))
+    throw new Error("Invalid battle format");
   return unwrap(
     requireClient()
       .from("profiles")
       .select(
-        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,games,wins",
+        "id,username,rating_a1,rating_a2,rating_b1,rating_b2,rating_c1,rating_sentence_a1,rating_sentence_a2,rating_sentence_b1,rating_sentence_b2,rating_sentence_c1,games,wins,games_sentence,wins_sentence",
       )
-      .gt("games", 0)
-      .order(`rating_${level.toLowerCase()}`, { ascending: false })
+      .gt(format === "sentences" ? "games_sentence" : "games", 0)
+      .order(
+        `rating_${format === "sentences" ? "sentence_" : ""}${level.toLowerCase()}`,
+        { ascending: false },
+      )
       .order("username", { ascending: true })
       .limit(Math.max(1, Math.min(100, limit))),
   );
 }
 
-export function joinQueue(mode = "duel", level = "A1") {
+export function joinQueue(mode = "duel", level = "A1", format = "words") {
   validateLearningLevel(level);
+  if (!["words", "sentences"].includes(format))
+    throw new Error("Invalid battle format");
   return unwrap(
-    requireClient().rpc("join_matchmaking", { p_mode: mode, p_level: level }),
+    requireClient().rpc("join_matchmaking", {
+      p_mode: mode,
+      p_level: level,
+      p_format: format,
+    }),
   );
 }
 

@@ -7,8 +7,10 @@
     { "source": "/arena", "destination": "/index.html" },
     { "source": "/words", "destination": "/index.html" },
     { "source": "/leaderboard", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" }
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/plan", "destination": "/index.html" }
   ],
+  "functions": { "api/study-plan.js": { "maxDuration": 30 } },
   "headers": [
     {
       "source": "/(.*)",

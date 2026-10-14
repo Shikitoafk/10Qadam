@@ -1,6 +1,25 @@
 import "./style.css";
 import "./study.css";
 import "./library.css";
+import "./sentence-battle.css";
+import "./plan.css";
+import { createPlanController } from "./plan-ui.js";
+import {
+  battleFormatUI,
+  sentenceArenaUI,
+  sentenceResultUI,
+} from "./sentence-battle-ui.js";
+import {
+  BATTLE_FORMATS,
+  battleRules,
+  battleRemaining,
+  matchRules,
+  ratingColumn,
+  makeSentenceBattleDeck,
+  scoreSentenceBattle,
+  battleAccuracy,
+  sentenceCompare,
+} from "./sentence-battle.js";
 import { createStudyController } from "./study-ui.js";
 import { studyWords } from "./study.js";
 import { libraryPage, libraryMeaning } from "./library.js";
@@ -13,8 +32,6 @@ import {
   savePractice,
   comparePlayers,
   playerPlace,
-  ROUND_COUNT,
-  ROUND_SECONDS,
 } from "./game.js";
 import * as online from "./online.js";
 import {
@@ -79,6 +96,7 @@ const state = {
   wordQuery: "",
   wordPage: 1,
   mode: "duel",
+  format: "words",
   user: null,
   profile: null,
   match: null,
@@ -142,6 +160,27 @@ try {
 study.setLevel(selectedStudyLevel || "A1");
 state.wordLevel = study.getLevel();
 state.level = study.getLevel();
+const plan = createPlanController({
+  language: () => state.language,
+  escape,
+  render,
+  getLevel: () => accountLearningLevel(state.user) || study.getLevel(),
+  getUser: () => state.user,
+  getAccessToken: online.getAccessToken,
+  onSignIn: () => showAuth(),
+  openLevel: (level, kind) => {
+    study.setLevel(level);
+    navigate("study");
+    study.action({
+      dataset: {
+        studyAction: "tab",
+        value: kind === "dictation" ? "sentences" : "cards",
+      },
+    });
+    if (kind === "review")
+      study.action({ dataset: { studyAction: "cards-unknown" } });
+  },
+});
 let pendingPage = "arena";
 
 function syncRoute(page, replace = false) {
@@ -153,6 +192,7 @@ window.addEventListener("popstate", () => {
   const route = readRoute(window.location.pathname);
   stopGame();
   study.stop();
+  plan.stop();
   if (route.level) study.setLevel(route.level);
   state.page = route.page;
   render();
@@ -176,7 +216,7 @@ function navItem(page, label, icon) {
   return `<button class="nav-item ${state.page === page ? "active" : ""}" data-page="${page}" aria-label="${label}" ${state.page === page ? 'aria-current="page"' : ""}>${icons[icon]}<span>${label}</span>${state.page === page ? '<span class="nav-dot"></span>' : ""}</button>`;
 }
 function shell(content) {
-  return `<aside class="sidebar"><a class="brand" href="#" aria-label="10Qadam, главная"><span class="brand-mark" role="img" aria-label="Логотип 10Qadam"></span><span>10Qadam<span class="brand-sub">THE SPELLING ARENA</span></span></a><div class="nav-label">PLAYGROUND</div><nav aria-label="Главная навигация">${navItem("arena", "Арена", "arena")}${navItem("study", "Учиться", "cards")}${navItem("leaders", "Рейтинг", "chart")}${navItem("words", "Словарь", "book")}${navItem("profile", "Мой профиль", "user")}</nav><div class="sidebar-bottom"><div class="mini-note"><p>Маленькие шаги.<br><strong>Большой словарный запас.</strong></p></div><span class="side-version">MADE FOR YOUR NEXT LEVEL ↗</span></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">PLAYGROUND <span>/</span> ${escape({ arena: "Арена", leaders: "Рейтинг", words: "Словарь", profile: "Профиль", game: "Матч", study: "Учиться", welcome: "Знакомство" }[state.page] || "Арена")}</div><div class="top-actions"><select id="language-select" aria-label="Language" title="Language">${[
+  return `<aside class="sidebar"><a class="brand" href="#" aria-label="10Qadam, главная"><span class="brand-mark" role="img" aria-label="Логотип 10Qadam"></span><span>10Qadam<span class="brand-sub">THE SPELLING ARENA</span></span></a><div class="nav-label">PLAYGROUND</div><nav aria-label="Главная навигация">${navItem("arena", "Арена", "arena")}${navItem("study", "Учиться", "cards")}${navItem("leaders", "Рейтинг", "chart")}${navItem("words", "Словарь", "book")}${navItem("plan", t("My study plan", state.language), "cards")}${navItem("profile", "Мой профиль", "user")}</nav><div class="sidebar-bottom"><div class="mini-note"><p>Маленькие шаги.<br><strong>Большой словарный запас.</strong></p></div><span class="side-version">MADE FOR YOUR NEXT LEVEL ↗</span></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">PLAYGROUND <span>/</span> ${escape({ arena: "Арена", leaders: "Рейтинг", words: "Словарь", profile: "Профиль", plan: t("My study plan", state.language), game: "Матч", study: "Учиться", welcome: "Знакомство" }[state.page] || "Арена")}</div><div class="top-actions"><select id="language-select" aria-label="Language" title="Language">${[
     ["en", "EN"],
     ["kk", "KZ"],
     ["ru", "RU"],
@@ -197,6 +237,7 @@ function render() {
     leaders: renderLeaders,
     words: renderWords,
     profile: renderProfile,
+    plan: () => plan.render(),
     game: renderGame,
   };
   app.innerHTML = shell((pages[state.page] || renderArena)());
@@ -209,11 +250,13 @@ function render() {
       canonical.href,
     ).href;
   document.title = t(
-    state.page === "welcome"
-      ? "10Qadam — learn English at your level"
-      : state.page === "study"
-        ? "10Qadam — your learning space"
-        : "10Qadam — English spelling arena",
+    state.page === "plan"
+      ? "10Qadam — your study plan"
+      : state.page === "welcome"
+        ? "10Qadam — learn English at your level"
+        : state.page === "study"
+          ? "10Qadam — your learning space"
+          : "10Qadam — English spelling arena",
     state.language,
   );
   document
@@ -231,7 +274,7 @@ function render() {
 }
 function rating() {
   const p = state.profile;
-  return p ? (p[`rating_${state.level.toLowerCase()}`] ?? 1000) : null;
+  return p ? (p[ratingColumn(state.level, state.format)] ?? 1000) : null;
 }
 function learningShortcut() {
   if (accountLearningLevel(state.user)) return renderLearningPreference();
@@ -267,12 +310,29 @@ function renderWelcome() {
     )
     .join("")}</div></div>`;
 }
+function renderBattleFormat() {
+  return battleFormatUI(state, escape);
+}
+function renderSentenceArena() {
+  return sentenceArenaUI({
+    state,
+    escape,
+    icons,
+    levels: LEARNING_LEVELS,
+    modes,
+    onlineConfigured: online.isOnlineConfigured,
+    shortcut: learningShortcut(),
+  });
+}
 function renderArena() {
-  const personal = state.history;
+  if (state.format === "sentences") return renderSentenceArena();
+  const personal = state.history.filter(
+    (entry) => entry.format !== "sentences",
+  );
   return `<section class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> <span data-no-i18n>10QADAM —</span></div><h1 data-no-i18n>${slogan(state.language)[0]}<br><span class="underlined">${slogan(state.language)[1]}</span></h1><p>Английский на слух. Баттлы на скорость.<br>Десять слов, чтобы стать чуть лучше.</p></div><div class="intro-stamp"><span>LISTEN</span><span class="stamp-cross">×</span><span>TYPE</span><span class="stamp-cross">×</span><span>WIN</span><i>↗</i></div></section>
   <section class="hero-arena" aria-label="Соревнование по spelling"><div class="hero-copy"><span class="pill">${icons.bolt} ТВОЯ СЛЕДУЮЩАЯ ПОБЕДА</span><h2>Включай звук.<br>Выключай сомнения.</h2><p>Слово прозвучало. Таймер пошёл.<br>Кто напишет правильно первым?</p><button class="button light" data-action="quick-play">Выйти на арену ${icons.arrow}</button><div class="hero-meta"><span>10 СЛОВ</span><i></i><span>12 СЕК / СЛОВО</span><i></i><span>A1 — C1</span></div></div><div class="hero-visual" aria-hidden="true"><div class="visual-grid"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="floating-label">EVERY LETTER COUNTS</span><div class="letter-tile tile-s">S<span>01</span></div><div class="letter-tile tile-p">P<span>02</span></div><div class="letter-tile tile-e">E<span>03</span></div><div class="letter-tile tile-l">L<span>04</span></div><div class="letter-tile tile-l2">L<span>05</span></div><div class="visual-score"><span class="score-check">${icons.check}</span><div>THAT'S CORRECT.<small>+100 accuracy &nbsp; +42 speed</small></div></div><div class="visual-corner">01:24 <span>● REC</span></div></div></section>
   ${learningShortcut()}
-  <section class="mode-section"><div class="section-heading"><div><span class="eyebrow small">PICK YOUR BATTLE</span><h2>Как играем?</h2></div><div class="level-select" aria-label="Уровень английского"><span>Уровень слов</span><div role="group">${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}" aria-pressed="${state.level === l}">${l}</button>`).join("")}</div></div></div><div class="mode-grid">${Object.entries(
+  <section class="mode-section">${renderBattleFormat()}<div class="section-heading"><div><span class="eyebrow small">PICK YOUR BATTLE</span><h2>Как играем?</h2></div><div class="level-select" aria-label="Уровень английского"><span>Уровень слов</span><div role="group">${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}" aria-pressed="${state.level === l}">${l}</button>`).join("")}</div></div></div><div class="mode-grid">${Object.entries(
     modes,
   )
     .map(
@@ -285,7 +345,7 @@ function renderArena() {
   <section class="bottom-section"><div class="how-block"><div class="section-heading"><h2>Три шага к победе</h2><button class="text-link" data-action="rules">Правила ${icons.arrow}</button></div><div class="steps"><div><b>01</b>${icons.sound}<h3>Слушай</h3><p>Слово звучит на английском.<br>Можно послушать ещё раз.</p></div><div><b>02</b>${icons.bolt}<h3>Пиши</h3><p>Введи слово и нажми Enter.<br>Точность важнее скорости.</p></div><div><b>03</b>${icons.trophy}<h3>Забирай очки</h3><p>Правильный ответ — 100 очков.<br>Скорость — до 50 сверху.</p></div></div></div><aside class="progress-note"><span class="eyebrow small">YOUR PERSONAL BEST</span><h3>${personal.length ? Math.max(...personal.map((x) => x.score)) : "—"}<span>очков</span></h3><p>${personal.length ? `Ты уже завершил ${personal.length} тренировок. Следующий рекорд рядом.` : "Первая тренировка — начало твоей истории. Сделаем первый шаг?"}</p><button class="text-link" data-action="solo">В соло ${icons.arrow}</button></aside></section>`;
 }
 function renderLeaders() {
-  return `<section class="simple-intro"><span class="eyebrow">THE SPELLING CLUB</span><h1>Таблица <span class="underlined">лидеров.</span></h1><p>Правильные слова. Заслуженные победы.</p></section><div class="section-heading"><h2>Рейтинг ${state.level}</h2><div class="level-select"><div>${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><div class="leader-table"><div class="leader-row heading"><span>МЕСТО</span><span>ИГРОК</span><span>РЕЙТИНГ</span></div>${state.leaderLoading ? '<div class="empty-state">Загружаем рейтинг…</div>' : state.leaderboard.length ? state.leaderboard.map((p, i) => `<div class="leader-row"><span class="leader-place">${String(i + 1).padStart(2, "0")}</span><span class="leader-player">${avatar(p.username)}<span data-no-i18n>${escape(p.username)}</span>${p.id === state.user?.id ? "<small>ТЫ</small>" : ""}</span><strong>${escape(p.rating ?? p[`rating_${state.level.toLowerCase()}`] ?? 1000)}</strong></div>`).join("") : `<div class="empty-state">${icons.trophy}<h3>${online.isOnlineConfigured ? "Лидеры ещё не появились" : "Здесь будут настоящие игроки"}</h3><p>${online.isOnlineConfigured ? "Заверши первый рейтинговый матч и займи своё место." : "Таблица заработает после подключения Supabase. А пока можно поставить личный рекорд в соло."}</p><button class="button dark" data-action="solo">Играть соло ${icons.arrow}</button></div>`}</div>`;
+  return `${renderBattleFormat()}<section class="simple-intro"><span class="eyebrow">THE SPELLING CLUB</span><h1>Таблица <span class="underlined">лидеров.</span></h1><p>Правильные слова. Заслуженные победы.</p></section><div class="section-heading"><h2>Рейтинг ${state.level}</h2><div class="level-select"><div>${LEARNING_LEVELS.map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}">${l}</button>`).join("")}</div></div></div><div class="leader-table"><div class="leader-row heading"><span>МЕСТО</span><span>ИГРОК</span><span>РЕЙТИНГ</span></div>${state.leaderLoading ? '<div class="empty-state">Загружаем рейтинг…</div>' : state.leaderboard.length ? state.leaderboard.map((p, i) => `<div class="leader-row"><span class="leader-place">${String(i + 1).padStart(2, "0")}</span><span class="leader-player">${avatar(p.username)}<span data-no-i18n>${escape(p.username)}</span>${p.id === state.user?.id ? "<small>ТЫ</small>" : ""}</span><strong>${escape(p.rating ?? p[ratingColumn(state.level, state.format)] ?? 1000)}</strong></div>`).join("") : `<div class="empty-state">${icons.trophy}<h3>${online.isOnlineConfigured ? "Лидеры ещё не появились" : "Здесь будут настоящие игроки"}</h3><p>${online.isOnlineConfigured ? "Заверши первый рейтинговый матч и займи своё место." : "Таблица заработает после подключения Supabase. А пока можно поставить личный рекорд в соло."}</p><button class="button dark" data-action="solo">Играть соло ${icons.arrow}</button></div>`}</div>`;
 }
 function renderWords() {
   const tr = (key) => escape(t(key, state.language));
@@ -358,14 +418,16 @@ function applyLearningLevel(level) {
   state.wordQuery = "";
 }
 function renderProfile() {
-  const history = state.history;
-  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section>${renderLearningPreference()}<div class="stat-grid">${LEARNING_LEVELS.map((level) => `<div><span>${t("РЕЙТИНГ", state.language)} ${level}</span><strong>${state.profile?.[`rating_${level.toLowerCase()}`] ?? "—"}</strong><small>${t("Дуэли и баттлы", state.language)}</small></div>`).join("")}<div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
+  const history = state.history.filter(
+    (entry) => (entry.format || "words") === state.format,
+  );
+  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section>${renderLearningPreference()}${renderBattleFormat()}<div class="stat-grid">${LEARNING_LEVELS.map((level) => `<div><span>${t("РЕЙТИНГ", state.language)} ${level}</span><strong>${state.profile?.[ratingColumn(level, state.format)] ?? "—"}</strong><small>${t("Дуэли и баттлы", state.language)}</small></div>`).join("")}<div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
     history.length
       ? history
           .slice(0, 10)
           .map(
             (x) =>
-              `<div class="history-row"><span class="history-icon">${icons.bolt}</span><div><strong>Соло · ${escape(x.level)}</strong><small>${new Date(x.date).toLocaleDateString(LOCALES[state.language], { day: "numeric", month: "long" })}</small></div><span>${x.correct}/10 <small>верно</small></span><strong>${x.score} <small>очков</small></strong></div>`,
+              `<div class="history-row"><span class="history-icon">${icons.bolt}</span><div><strong>Соло · ${escape(x.level)}</strong><small>${new Date(x.date).toLocaleDateString(LOCALES[state.language], { day: "numeric", month: "long" })}</small></div><span>${x.format === "sentences" ? `${battleAccuracy(x, x)}%` : `${x.correct}/${x.roundCount || 10}`} <small>${x.format === "sentences" ? t("Accuracy", state.language) : "верно"}</small></span><strong>${x.score} <small>очков</small></strong></div>`,
           )
           .join("")
       : '<div class="empty-state"><h3>Чистый лист — хороший старт</h3><p>Заверши тренировку, и здесь появится первый результат.</p></div>'
@@ -392,6 +454,12 @@ function closeModal() {
   }
 }
 function showRules() {
+  if (state.format === "sentences") {
+    modal(
+      `<span class="eyebrow">SENTENCE ARENA</span><h2>${escape(t("Sentences", state.language))}</h2><p class="modal-sub">${escape(t("5 sentences · 35 seconds each", state.language))}<br>${escape(t("Replay as often as you need before time runs out. One submitted answer per round.", state.language))}</p><p class="modal-sub">${escape(t("Sentence accuracy decides the winner. No speed bonus. Equal accuracy is a draw.", state.language))}<br>${escape(t("Capital letters and punctuation do not affect accuracy. Missing rounds count as zero.", state.language))}</p><button class="button dark full" data-action="close">${escape(t("Продолжить играть", state.language))}</button>`,
+    );
+    return;
+  }
   modal(
     `<span class="eyebrow">THE RULES ARE SIMPLE</span><h2>Слушай. Пиши.<br>Побеждай.</h2><div class="rules-list"><p><b>01</b><span>В матче 10 слов. На каждое — 12 секунд. В онлайне все участники получают одинаковую последовательность.</span></p><p><b>02</b><span>Слушай слово, вводи ответ и нажимай Enter. Повторное прослушивание не останавливает таймер.</span></p><p><b>03</b><span>Правильное слово даёт 100 очков. Чем быстрее ответ, тем больше бонус — до 50 очков.</span></p><p><b>04</b><span>Одна попытка на слово. Регистр букв не важен. Побеждает тот, у кого больше верных слов. При равной точности решают очки за скорость; полный равный результат — ничья.</span></p><p><b>05</b><span>У каждого уровня A1–C1 отдельный рейтинг. В соло и демо рейтинг не меняется.</span></p></div><button class="button dark full" data-action="close">Понятно, погнали ${icons.arrow}</button>`,
   );
@@ -431,6 +499,7 @@ function speak(word) {
 }
 
 document.addEventListener("change", (event) => {
+  if (plan.change(event)) return;
   if (study.change(event)) return;
   if (event.target.id !== "language-select") return;
   const answer = document.querySelector("#answer");
@@ -462,6 +531,7 @@ function renderFilteredWords(query = state.wordQuery, resetPage = false) {
 }
 
 document.addEventListener("click", async (event) => {
+  if (plan.click(event)) return;
   const el = event.target.closest(
     "button,a.brand,a.footer-brand,a[data-study-level]",
   );
@@ -492,6 +562,13 @@ document.addEventListener("click", async (event) => {
     document
       .querySelector(".library-toolbar")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (BATTLE_FORMATS.includes(el.dataset.battleFormat)) {
+    state.format = el.dataset.battleFormat;
+    state.leaderboard = [];
+    render();
+    if (state.page === "leaders") fetchLeaders();
     return;
   }
   if (LEARNING_LEVELS.includes(el.dataset.level)) {
@@ -529,7 +606,16 @@ document.addEventListener("click", async (event) => {
     startLocal(state.mode);
   }
   if (action === "play" || action === "quick-play") play();
-  if (action === "listen" && state.match?.currentWord)
+  if (
+    action === "listen" &&
+    state.match?.currentWord &&
+    battleRemaining(
+      state.match,
+      state.match.local
+        ? performance.now()
+        : Date.now() + (state.match.offset || 0),
+    ) > 0
+  )
     speak(state.match.currentWord);
   if (action === "leave") showLeave();
   if (action === "confirm-leave") {
@@ -568,12 +654,14 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("input", (event) => {
+  plan.input(event);
   study.input(event);
   if (event.target.id === "word-search") {
     renderFilteredWords(event.target.value, true);
   }
 });
 document.addEventListener("submit", async (event) => {
+  if (plan.submit(event)) return;
   if (study.submit(event)) return;
   if (event.target.id === "learning-level-form") {
     event.preventDefault();
@@ -630,7 +718,10 @@ document.addEventListener("submit", async (event) => {
       }
       await refreshUser();
       closeModal();
-      if (accountLearningLevel(state.user)) navigate("study");
+      if (state.page === "plan") {
+        render();
+        offerLearningLevel();
+      } else if (accountLearningLevel(state.user)) navigate("study");
       else {
         render();
         offerLearningLevel();
@@ -652,6 +743,7 @@ function navigate(page) {
     return;
   }
   if (state.page === "study" && page !== "study") study.stop();
+  if (state.page === "plan" && page !== "plan") plan.stop();
   state.page = page;
   syncRoute(page);
   render();
@@ -662,10 +754,11 @@ async function fetchLeaders() {
   if (!online.isOnlineConfigured) return;
   const request = ++leaderRequest;
   const level = state.level;
+  const format = state.format;
   state.leaderLoading = true;
   render();
   try {
-    const leaders = await online.getLeaderboard(level);
+    const leaders = await online.getLeaderboard(level, format);
     if (request === leaderRequest) state.leaderboard = leaders;
   } catch (error) {
     toast(error.message);
@@ -747,7 +840,12 @@ function startLocal(mode) {
     local: true,
     mode,
     level: state.level,
-    deck: makeDeck(state.level),
+    format: state.format,
+    ...battleRules(state.format),
+    deck:
+      state.format === "sentences"
+        ? makeSentenceBattleDeck(state.level)
+        : makeDeck(state.level),
     index: -1,
     score: 0,
     correct: 0,
@@ -785,9 +883,22 @@ function renderGame() {
       ]
     : m.players || [];
   const mine = playerList.find((p) => p.id === state.user?.id) || playerList[0];
-  return `<section class="game-top"><button class="text-link" data-action="leave">${icons.exit} Покинуть матч</button><span class="match-label">${m.local && m.mode !== "solo" ? "ДЕМО С БОТАМИ" : m.mode === "solo" ? "ТРЕНИРОВКА" : "РЕЙТИНГОВЫЙ МАТЧ"} <b>${m.level}</b></span></section><div class="game-title"><span class="eyebrow">${modes[m.mode].label}</span><h1>${modes[m.mode].name}<span class="game-round" id="round-label">${m.index < 0 ? "Сейчас начнём" : `Слово ${m.index + 1} / 10`}</span></h1></div><section class="game-layout"><div class="game-stage"><div class="round-progress" id="round-progress">${Array.from({ length: 10 }, (_, i) => `<span class="${i < m.index ? "complete" : i === m.index ? "current" : ""}"></span>`).join("")}</div><div class="game-countdown" id="game-countdown" ${m.index >= 0 ? "hidden" : ""}><span>ПАЛЬЦЫ НА КЛАВИАТУРЕ</span><strong id="countdown-number">3</strong><p>Включи звук. Первое слово уже близко.</p></div><div class="challenge" id="challenge" ${m.index < 0 ? "hidden" : ""}><div class="challenge-timer"><span>${icons.time} ОСТАЛОСЬ</span><strong id="seconds">12.0<span>с</span></strong></div><button class="listen-button" data-action="listen" aria-label="Послушать слово ещё раз">${icons.sound}<span>Послушать слово<small>Нажми для повторения</small></span><span class="audio-bars"><i></i><i></i><i></i><i></i><i></i></span></button><form id="answer-form" autocomplete="off"><label for="answer">ЧТО ТЫ УСЛЫШАЛ?</label><div class="answer-wrap"><input id="answer" name="answer" placeholder="Напиши слово…" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" maxlength="64" ${m.answered ? "disabled" : ""} /><button type="submit" aria-label="Отправить ответ" ${m.answered ? "disabled" : ""}>${icons.arrow}</button></div><div id="answer-feedback" class="answer-feedback" role="status">${m.answered ? "Ответ принят. Ждём следующее слово." : "Enter — отправить ответ · Одна попытка"}</div></form><div class="time-track"><span id="time-track-fill"></span></div></div><div class="game-stage-foot"><span>${icons.sound} Английский · UK</span><span>Точность + скорость</span></div></div><aside class="scoreboard"><span class="eyebrow">НА АРЕНЕ</span><h2>${m.mode === "solo" ? "Твой результат" : "Счёт матча"}</h2><div id="scoreboard-players">${playerList.map((p, i) => `<div class="score-player ${p.id === "self" || p.id === state.user?.id ? "you" : ""}" data-player="${escape(p.id)}">${avatar(p.username)}<div><strong><span data-no-i18n>${escape(p.username)}</span></strong><small>${p.bot ? "ДЕМО-БОТ" : p.id === "self" || p.id === state.user?.id ? "ЭТО ТЫ" : `ИГРОК ${i + 1}`}</small></div><b class="player-score">${p.score || 0}</b></div>`).join("")}</div><div class="score-explainer"><span>${icons.bolt}</span><p><strong>Каждая буква важна.</strong>100 очков за верное слово.<br>До 50 сверху за скорость.</p></div><div class="personal-correct"><span>Верных ответов</span><strong id="correct-counter">${mine?.correct || 0}<small> / 10</small></strong></div></aside></section>`;
+  const sentence = m.format === "sentences";
+  const rules = matchRules(m);
+  const tr = (key) => escape(t(key, state.language));
+  return `<section class="game-top"><button class="text-link" data-action="leave">${icons.exit} Покинуть матч</button><span class="match-label">${m.local && m.mode !== "solo" ? "ДЕМО С БОТАМИ" : m.mode === "solo" ? "ТРЕНИРОВКА" : "РЕЙТИНГОВЫЙ МАТЧ"} <b>${m.level} · ${tr(sentence ? "Sentences" : "Words")}</b></span></section><div class="game-title"><span class="eyebrow">${modes[m.mode].label}</span><h1>${modes[m.mode].name}<span class="game-round" id="round-label">${m.index < 0 ? "Сейчас начнём" : `${sentence ? tr("Sentence") : t("Слово", state.language)} ${m.index + 1} / ${rules.roundCount}`}</span></h1></div><section class="game-layout"><div class="game-stage ${sentence ? "sentence-stage" : ""}"><div class="round-progress" id="round-progress">${Array.from({ length: rules.roundCount }, (_, i) => `<span class="${i < m.index ? "complete" : i === m.index ? "current" : ""}"></span>`).join("")}</div><div class="game-countdown" id="game-countdown" ${m.index >= 0 ? "hidden" : ""}><span>ПАЛЬЦЫ НА КЛАВИАТУРЕ</span><strong id="countdown-number">3</strong><p>${sentence ? tr("Listen, type and compare your accuracy.") : "Включи звук. Первое слово уже близко."}</p></div><div class="challenge" id="challenge" ${m.index < 0 ? "hidden" : ""}><div class="challenge-timer"><span>${icons.time} ОСТАЛОСЬ</span><strong id="seconds">${rules.roundSeconds.toFixed(1)}<span>с</span></strong></div><button class="listen-button" data-action="listen" aria-label="${sentence ? tr("Listen to the sentence") : t("Послушать слово ещё раз", state.language)}">${icons.sound}<span>${sentence ? tr("Listen to the sentence") : "Послушать слово"}<small>${sentence ? tr("Replay is available until the round ends.") : "Нажми для повторения"}</small></span><span class="audio-bars"><i></i><i></i><i></i><i></i><i></i></span></button><form id="answer-form" autocomplete="off"><label for="answer">ЧТО ТЫ УСЛЫШАЛ?</label><div class="answer-wrap"><${sentence ? "textarea" : "input"} id="answer" name="answer" placeholder="${sentence ? tr("Type the sentence…") : t("Напиши слово…", state.language)}" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" maxlength="${rules.answerLength}" ${sentence ? 'rows="3"' : ""} ${m.answered ? "disabled" : ""}>${sentence ? "</textarea>" : ""}<button type="submit" aria-label="Отправить ответ" ${m.answered ? "disabled" : ""}>${icons.arrow}</button></div><div id="answer-feedback" class="answer-feedback" role="status">${m.answered ? (sentence ? tr("Answer accepted. Listen again while you wait.") : "Ответ принят. Ждём следующее слово.") : "Enter — отправить ответ · Одна попытка"}</div></form><div class="time-track"><span id="time-track-fill"></span></div></div><div class="game-stage-foot"><span>${icons.sound} Английский · UK</span><span>${sentence ? tr("Accuracy only") : "Точность + скорость"}</span></div></div><aside class="scoreboard"><span class="eyebrow">НА АРЕНЕ</span><h2>${m.mode === "solo" ? "Твой результат" : "Счёт матча"}</h2><div id="scoreboard-players">${playerList.map((p, i) => `<div class="score-player ${p.id === "self" || p.id === state.user?.id ? "you" : ""}" data-player="${escape(p.id)}">${avatar(p.username)}<div><strong><span data-no-i18n>${escape(p.username)}</span></strong><small>${p.bot ? "ДЕМО-БОТ" : p.id === "self" || p.id === state.user?.id ? "ЭТО ТЫ" : `ИГРОК ${i + 1}`}</small></div><b class="player-score">${sentence ? `${battleAccuracy(p, m)}%` : p.score || 0}</b></div>`).join("")}</div><div class="score-explainer"><span>${icons.bolt}</span><p>${sentence ? `<strong>${tr("Average accuracy")}</strong>${tr("Sentence accuracy decides the winner. No speed bonus. Equal accuracy is a draw.")}` : "<strong>Каждая буква важна.</strong>100 очков за верное слово.<br>До 50 сверху за скорость."}</p></div><div class="personal-correct"><span>${sentence ? tr("Average accuracy") : "Верных ответов"}</span><strong id="correct-counter">${sentence ? battleAccuracy(mine, m) : mine?.correct || 0}<small>${sentence ? "%" : ` / ${rules.roundCount}`}</small></strong></div></aside></section>`;
 }
 function bindAnswer() {
+  document.querySelector("#answer")?.addEventListener("keydown", (event) => {
+    if (
+      state.match?.format === "sentences" &&
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      submitCurrent();
+    }
+  });
   document.querySelector("#answer")?.addEventListener("paste", (e) => {
     e.preventDefault();
     toast("Вводи слово вручную — это spelling!");
@@ -807,31 +918,34 @@ function tickLocal() {
   updateTimer(remaining);
   if (m.answered) {
     if (performance.now() >= m.advanceAt) nextLocalRound();
-  } else if (remaining <= 0) recordLocalAnswer("", ROUND_SECONDS * 1000);
+  } else if (remaining <= 0)
+    recordLocalAnswer("", matchRules(m).roundSeconds * 1000);
 }
 function nextLocalRound() {
   const m = state.match;
   if (!m) return;
   m.index++;
-  if (m.index >= ROUND_COUNT) {
+  if (m.index >= matchRules(m).roundCount) {
     finishLocal();
     return;
   }
   m.answered = false;
   m.currentWord = m.deck[m.index].word;
   m.roundStart = performance.now();
-  m.deadline = m.roundStart + ROUND_SECONDS * 1000;
+  m.deadline = m.roundStart + matchRules(m).roundSeconds * 1000;
   render();
   document.querySelector("#answer")?.focus();
   speak(m.currentWord);
 }
 function updateTimer(remaining) {
+  const listen = document.querySelector('[data-action="listen"]');
+  if (listen) listen.disabled = remaining <= 0;
   const seconds = document.querySelector("#seconds");
   if (seconds)
     seconds.innerHTML = `${Math.max(0, remaining / 1000).toFixed(1)}<span>${t("с", state.language)}</span>`;
   const fill = document.querySelector("#time-track-fill");
   if (fill) {
-    fill.style.width = `${Math.max(0, Math.min(100, remaining / (ROUND_SECONDS * 10)))}%`;
+    fill.style.width = `${Math.max(0, Math.min(100, remaining / (matchRules(state.match).roundSeconds * 10)))}%`;
     fill.classList.toggle("urgent", remaining < 3000);
   }
 }
@@ -865,9 +979,11 @@ async function submitCurrent() {
       feedback.className =
         "answer-feedback " + (result.correct ? "good" : "bad");
       feedback.textContent = t(
-        result.correct
-          ? `Верно! +${result.points ?? result.score ?? 100} очков`
-          : "В этот раз не получилось. Следующее слово — новый шанс.",
+        m.format === "sentences"
+          ? `${t("Accuracy", state.language)}: ${result.accuracy ?? result.points ?? 0}% · ${t("Waiting for the next round.", state.language)}`
+          : result.correct
+            ? `Верно! +${result.points ?? result.score ?? 100} очков`
+            : "В этот раз не получилось. Следующее слово — новый шанс.",
         state.language,
       );
     }
@@ -895,22 +1011,39 @@ function recordLocalAnswer(answer, elapsed) {
   const m = state.match;
   if (!m || m.answered) return;
   m.answered = true;
-  const result = scoreAnswer(answer, m.currentWord, elapsed);
+  const result =
+    m.format === "sentences"
+      ? scoreSentenceBattle(
+          answer,
+          m.currentWord,
+          elapsed,
+          matchRules(m).roundSeconds,
+        )
+      : scoreAnswer(answer, m.currentWord, elapsed);
   m.score += result.points;
-  if (result.points > 0) m.correct++;
+  if (result.correct && result.points > 0) m.correct++;
   m.answers.push({
     word: m.currentWord,
     translation: m.deck[m.index].translation,
     answer,
-    correct: result.points > 0,
+    correct: result.correct && result.points > 0,
+    accuracy: result.accuracy,
     points: result.points,
   });
   m.players.forEach((p) => {
     const correct = Math.random() < 0.72;
-    const points = correct
-      ? scoreAnswer(m.currentWord, m.currentWord, 1500 + Math.random() * 7000)
-          .points
-      : 0;
+    const points =
+      m.format === "sentences"
+        ? correct
+          ? 100
+          : 45 + Math.floor(Math.random() * 45)
+        : correct
+          ? scoreAnswer(
+              m.currentWord,
+              m.currentWord,
+              1500 + Math.random() * 7000,
+            ).points
+          : 0;
     p.score += points;
     if (correct) p.correct++;
   });
@@ -921,9 +1054,11 @@ function recordLocalAnswer(answer, elapsed) {
   feedback.className =
     "answer-feedback " + (result.points > 0 ? "good" : "bad");
   feedback.textContent = t(
-    result.points > 0
-      ? `Верно! +${result.points} очков`
-      : `${answer ? "Правильно:" : "Время вышло:"} ${m.currentWord}`,
+    m.format === "sentences"
+      ? `${t("Accuracy", state.language)}: ${result.accuracy}% · ${t("Waiting for the next round.", state.language)}`
+      : result.points > 0
+        ? `Верно! +${result.points} очков`
+        : `${answer ? "Правильно:" : "Время вышло:"} ${m.currentWord}`,
     state.language,
   );
   m.advanceAt = performance.now() + 1200;
@@ -932,10 +1067,14 @@ function recordLocalAnswer(answer, elapsed) {
       el.dataset.player === "self"
         ? m
         : m.players.find((p) => p.id === el.dataset.player);
-    if (p) el.querySelector(".player-score").textContent = p.score;
+    if (p)
+      el.querySelector(".player-score").textContent =
+        m.format === "sentences" ? `${battleAccuracy(p, m)}%` : p.score;
   });
   document.querySelector("#correct-counter").innerHTML =
-    `${m.correct}<small> / 10</small>`;
+    m.format === "sentences"
+      ? `${battleAccuracy(m, m)}<small>%</small>`
+      : `${m.correct}<small> / ${matchRules(m).roundCount}</small>`;
 }
 function finishLocal() {
   const m = state.match;
@@ -950,14 +1089,22 @@ function finishLocal() {
       correct: m.correct,
     },
     ...m.players,
-  ].sort(comparePlayers);
+  ].sort(m.format === "sentences" ? sentenceCompare : comparePlayers);
   if (m.mode === "solo") {
-    savePractice({ score: m.score, correct: m.correct, level: m.level });
+    savePractice({
+      score: m.score,
+      correct: m.correct,
+      level: m.level,
+      format: m.format,
+      roundCount: matchRules(m).roundCount,
+    });
     state.history = loadPractice();
   }
   render();
 }
 function renderResult(m) {
+  if (m.format === "sentences")
+    return sentenceResultUI({ match: m, state, escape, icons, avatar });
   const results = [...(m.results || [])].sort(comparePlayers),
     mine = results.find(
       (p) => p.id === (m.local ? "self" : state.user?.id),
@@ -1015,16 +1162,17 @@ async function startQueue() {
   stopGame();
   closeModal();
   const mode = state.mode,
-    level = state.level;
+    level = state.level,
+    format = state.format;
   try {
-    const queue = await online.joinQueue(mode, level);
+    const queue = await online.joinQueue(mode, level, format);
     if (generation !== queueGeneration) return;
     if (queue.match_id) {
       startOnline(queue.match_id);
       return;
     }
     modal(
-      `<span class="eyebrow">FINDING YOUR MATCH</span><h2>Ищем твоего<br>соперника.</h2><div class="queue-animation"><span>a</span><i>×</i><span>?</span></div><p class="modal-sub">${modes[mode].name} · ${level}<br>Подбираем игроков с близким рейтингом.</p><p class="queue-time" id="queue-time">00:00</p><button class="button outline full" data-action="cancel-queue">Отменить поиск</button>`,
+      `<span class="eyebrow">FINDING YOUR MATCH</span><h2>Ищем твоего<br>соперника.</h2><div class="queue-animation"><span>a</span><i>×</i><span>?</span></div><p class="modal-sub">${modes[mode].name} · ${level} · ${t(format === "sentences" ? "Sentences" : "Words", state.language)}<br>Подбираем игроков с близким рейтингом.</p><p class="queue-time" id="queue-time">00:00</p><button class="button outline full" data-action="cancel-queue">Отменить поиск</button>`,
     );
     dialog.querySelector(".modal-close").remove();
     dialog.oncancel = (e) => {
@@ -1105,6 +1253,8 @@ async function startOnline(id) {
     local: false,
     mode: state.mode,
     level: state.level,
+    format: state.format,
+    ...battleRules(state.format),
     index: -1,
     players: [],
     answered: false,
@@ -1135,6 +1285,9 @@ async function pollMatch(initial = false) {
     const index = data.round_index ?? data.challenge?.index ?? -1;
     m.mode = data.mode;
     m.level = data.level;
+    m.format = data.format === "sentences" ? "sentences" : "words";
+    m.roundCount = data.round_count ?? battleRules(m.format).roundCount;
+    m.roundSeconds = data.round_seconds ?? battleRules(m.format).roundSeconds;
     m.offset = Date.parse(data.server_now) - Date.now();
     m.starts = Date.parse(data.starts_at);
     m.ends = Date.parse(data.ends_at);
@@ -1170,12 +1323,19 @@ async function pollMatch(initial = false) {
     } else {
       document.querySelectorAll("[data-player]").forEach((el) => {
         const p = m.players.find((x) => x.id === el.dataset.player);
-        if (p) el.querySelector(".player-score").textContent = p.score || 0;
+        if (p)
+          el.querySelector(".player-score").textContent =
+            m.format === "sentences"
+              ? `${battleAccuracy(p, m)}%`
+              : p.score || 0;
       });
       const me = m.players.find((p) => p.id === state.user?.id);
       const counter = document.querySelector("#correct-counter");
       if (counter)
-        counter.innerHTML = `${me?.correct || 0}<small> / 10</small>`;
+        counter.innerHTML =
+          m.format === "sentences"
+            ? `${battleAccuracy(me, m)}<small>%</small>`
+            : `${me?.correct || 0}<small> / ${matchRules(m).roundCount}</small>`;
       if (m.submitting !== m.index) {
         const input = document.querySelector("#answer");
         if (input) input.disabled = m.answered;
@@ -1199,7 +1359,9 @@ function tickOnline() {
     const num = document.querySelector("#countdown-number");
     if (num) num.textContent = Math.max(1, Math.ceil((m.starts - now) / 1000));
   } else {
-    updateTimer(m.starts + (m.index + 1) * ROUND_SECONDS * 1000 - now);
+    updateTimer(
+      m.starts + (m.index + 1) * matchRules(m).roundSeconds * 1000 - now,
+    );
   }
 }
 initialize();

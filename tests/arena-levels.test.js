@@ -5,15 +5,19 @@ import { readFileSync } from "node:fs";
 import { LEARNING_LEVELS } from "../src/routes.js";
 import { validateLearningLevel } from "../src/account-level.js";
 import { t } from "../src/i18n.js";
+import { ratingColumn } from "../src/sentence-battle.js";
 
 test("leaderboards request and sort the chosen level rating, never A2 for advanced users", async () => {
   const calls = [];
+  const filters = [];
+  const rpcCalls = [];
   const chain = {
     select(fields) {
       calls.push(["select", fields]);
       return this;
     },
-    gt() {
+    gt(column, threshold) {
+      filters.push([column, threshold]);
       return this;
     },
     order(column) {
@@ -30,7 +34,13 @@ test("leaderboards request and sort the chosen level rating, never A2 for advanc
       VITE_SUPABASE_URL: "https://test.invalid",
       VITE_SUPABASE_ANON_KEY: "public",
     },
-    createClient: () => ({ from: () => chain }),
+    createClient: () => ({
+      from: () => chain,
+      rpc(name, args) {
+        rpcCalls.push([name, args]);
+        return Promise.resolve({ data: {}, error: null });
+      },
+    }),
   };
   vm.createContext(context);
   const online = readFileSync(
@@ -50,6 +60,16 @@ test("leaderboards request and sort the chosen level rating, never A2 for advanc
   }
   assert.throws(() => context.getLeaderboard("C2"));
   assert.throws(() => context.joinQueue("duel", "__proto__"));
+  calls.length = 0;
+  filters.length = 0;
+  await context.getLeaderboard("C1", "sentences");
+  assert.equal(calls[1][1], "rating_sentence_c1");
+  assert.deepEqual(filters[0], ["games_sentence", 0]);
+  await context.joinQueue("duel", "C1", "sentences");
+  assert.equal(rpcCalls[0][0], "join_matchmaking");
+  assert.equal(rpcCalls[0][1].p_format, "sentences");
+  assert.equal(rpcCalls[0][1].p_level, "C1");
+  assert.throws(() => context.joinQueue("duel", "C1", "unsupported"));
 });
 
 test("production arena exposes five independent difficulty buttons and the actual chosen rating", () => {
@@ -77,6 +97,8 @@ test("production arena exposes five independent difficulty buttons and the actua
     },
     online: { isOnlineConfigured: true },
     learningShortcut: () => "",
+    renderBattleFormat: () => "",
+    ratingColumn,
     escape: String,
     loadPractice: () => [],
     slogan: () => ["Spell Your Way,", "Step by Step."],

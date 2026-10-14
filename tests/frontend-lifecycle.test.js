@@ -3,6 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { t } from "../src/i18n.js";
+import {
+  battleRules,
+  matchRules,
+  battleAccuracy,
+  scoreSentenceBattle,
+  makeSentenceBattleDeck,
+  sentenceCompare,
+  sentencePlace,
+} from "../src/sentence-battle.js";
 
 // Exercise the production asynchronous handlers with delayed RPCs, without a
 // browser, a Supabase account or copies of the application logic.
@@ -14,7 +23,9 @@ function productionFunction(name) {
   const next = /^(?:async )?function \w+\(/m.exec(rest);
   return source.slice(
     start.index,
-    next ? start.index + start[0].length + next.index : undefined,
+    next
+      ? start.index + start[0].length + next.index
+      : source.lastIndexOf("initialize();"),
   );
 }
 function deferred() {
@@ -43,11 +54,19 @@ function harness(functions, online = {}) {
   const feedback = { className: "", textContent: "" };
   const context = {
     t,
+    battleRules,
+    matchRules,
+    battleAccuracy,
+    scoreSentenceBattle,
+    makeSentenceBattleDeck,
+    sentenceCompare,
+    sentencePlace,
     study: { stop() {} },
     syncRoute() {},
     online,
     state: {
       mode: "duel",
+      format: "words",
       level: "A1",
       page: "arena",
       user: { id: "self" },
@@ -307,4 +326,104 @@ test("older state response cannot reopen a successfully submitted answer", async
   assert.equal(match.answered, true);
   assert.equal(input.disabled, true);
   assert.equal(button.disabled, true);
+});
+
+test("sentence protocol restores five 35-second rounds independently from the arena selection", async () => {
+  const { context: c } = harness(["pollMatch"], {
+    getMatchState: async () =>
+      matchState({
+        format: "sentences",
+        round_count: 5,
+        round_seconds: 35,
+        challenge: { word: "We should listen carefully." },
+      }),
+  });
+  c.state.match = { id: "old", local: false, index: -1 };
+  await c.pollMatch();
+  assert.equal(c.state.match.format, "sentences");
+  assert.equal(c.state.match.roundCount, 5);
+  assert.equal(c.state.match.roundSeconds, 35);
+  assert.equal(c.state.match.currentWord, "We should listen carefully.");
+});
+
+test("production sentence timer and progress use the current match duration, not twelve seconds", () => {
+  const { context: c } = harness(["updateTimer", "tickOnline"]);
+  const seconds = {},
+    listen = {},
+    fill = { style: {}, classList: { toggle() {} } };
+  c.document.querySelector = (selector) =>
+    selector === "#seconds"
+      ? seconds
+      : selector === "#time-track-fill"
+        ? fill
+        : selector === '[data-action="listen"]'
+          ? listen
+          : null;
+  c.state.match = {
+    format: "sentences",
+    index: 1,
+    starts: Date.now(),
+    roundSeconds: 35,
+    roundCount: 5,
+  };
+  c.updateTimer(17500);
+  assert.equal(fill.style.width, "50%");
+  assert.equal(seconds.innerHTML, "17.5<span>s</span>");
+  assert.equal(listen.disabled, false);
+  c.updateTimer(0);
+  assert.equal(listen.disabled, true);
+  const now = Date.now();
+  c.Date = { now: () => now };
+  c.state.match.starts = now - 50000;
+  c.tickOnline();
+  assert.equal(seconds.innerHTML, "20.0<span>s</span>");
+});
+
+test("production local sentence rounds finish at five and use 35-second deadlines", () => {
+  const { context: c } = harness(["nextLocalRound", "tickLocal"]);
+  c.performance = { now: () => 1000 };
+  c.state.match = {
+    local: true,
+    format: "sentences",
+    index: -1,
+    deck: makeSentenceBattleDeck("C1", () => 0),
+    finished: false,
+  };
+  c.nextLocalRound();
+  assert.equal(c.state.match.deadline, 36000);
+  assert.ok(c.state.match.currentWord.length > 15);
+  const answers = [];
+  c.recordLocalAnswer = (...args) => answers.push(args);
+  c.performance.now = () => 36000;
+  c.updateTimer = () => {};
+  c.tickLocal();
+  assert.deepEqual(answers, [["", 35000]]);
+  let finished = false;
+  c.finishLocal = () => {
+    finished = true;
+  };
+  c.state.match.index = 4;
+  c.nextLocalRound();
+  assert.equal(finished, true);
+  assert.equal(c.state.match.index, 5);
+});
+
+test("production sentence submission displays partial accuracy instead of marking it simply wrong", async () => {
+  const { context: c } = harness(["submitCurrent"], {
+    submitAnswer: async () => ({ correct: false, points: 78, accuracy: 78 }),
+  });
+  c.state.language = "en";
+  c.state.match = {
+    id: "old",
+    format: "sentences",
+    local: false,
+    index: 0,
+    answered: false,
+  };
+  await c.submitCurrent();
+  assert.equal(c.state.match.acceptedIndex, 0);
+  assert.match(
+    c.document.querySelector("#answer-feedback").textContent,
+    /Accuracy: 78%/,
+  );
 });

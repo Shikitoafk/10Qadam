@@ -6,6 +6,7 @@ const pages = {
   "/words": "words",
   "/leaderboard": "leaders",
   "/profile": "profile",
+  "/plan": "plan",
 };
 
 export function readRoute(pathname = "/") {

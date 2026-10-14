@@ -3,12 +3,16 @@
 import { STUDY_COPY } from "./study-copy.js";
 import { LIBRARY_COPY } from "./library-copy.js";
 import { ACCOUNT_COPY } from "./account-copy.js";
+import { SENTENCE_COPY } from "./sentence-copy.js";
+import { PLAN_COPY } from "./plan-copy.js";
 export const LANGUAGES = ["en", "kk", "ru"];
 export const LOCALES = { en: "en-GB", kk: "kk-KZ", ru: "ru-RU" };
 export const COPY = {
   ...STUDY_COPY,
   ...LIBRARY_COPY,
   ...ACCOUNT_COPY,
+  ...SENTENCE_COPY,
+  ...PLAN_COPY,
   Арена: ["Arena", "Арена"],
   Рейтинг: ["Leaderboard", "Рейтинг"],
   Словарь: ["Word bank", "Сөздік"],

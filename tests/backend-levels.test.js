@@ -348,8 +348,20 @@ test("ranked upgrade runs on actual prior schema without resetting live data", a
         const words = await rows("words");
         await db.exec(await readFile(schemaUrl, "utf8"));
         await db.exec(migration);
-        assert.deepEqual(await rows("profiles"), before);
-        assert.deepEqual(await rows("words"), words);
+        // Later additive upgrades can add columns/prompts; every original
+        // profile field and ranked word must still be byte-for-byte preserved.
+        const profilesAfter = await rows("profiles");
+        for (const player of before) {
+          const actual = profilesAfter.find((entry) => entry.id === player.id);
+          for (const [key, value] of Object.entries(player))
+            assert.deepEqual(actual[key], value);
+        }
+        const wordsAfter = await rows("words");
+        for (const word of words) {
+          const actual = wordsAfter.find((entry) => entry.id === word.id);
+          for (const [key, value] of Object.entries(word))
+            assert.deepEqual(actual[key], value);
+        }
         for (const field of ["rating_b1", "rating_b2", "rating_c1"])
           await assert.rejects(
             db.query(`update public.profiles set ${field}=99 where id=$1`, [

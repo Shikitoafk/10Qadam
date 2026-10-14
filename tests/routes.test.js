@@ -4,7 +4,7 @@ import { readRoute, pagePath, LEARNING_LEVELS } from "../src/routes.js";
 
 test("intro, learning and arena have independent URLs", () => {
   assert.equal(readRoute("/").page, "welcome");
-  for (const page of ["arena", "words", "leaders", "profile"])
+  for (const page of ["arena", "words", "leaders", "profile", "plan"])
     assert.equal(readRoute(pagePath(page)).page, page);
   assert.equal(readRoute("/learn/").page, "study");
 });
