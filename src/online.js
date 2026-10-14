@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { validateLearningLevel } from "./account-level.js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
@@ -41,15 +42,30 @@ export function onAuthStateChange(callback) {
   return () => data.subscription.unsubscribe();
 }
 
-export function signUp(email, password, username) {
+export function signUp(email, password, username, level = "A1") {
+  const learningLevel = validateLearningLevel(level);
   return unwrap(
     requireClient().auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { username: username.trim() },
+        data: {
+          username: username.trim(),
+          learning_level: learningLevel,
+        },
         emailRedirectTo: window.location.origin,
       },
+    }),
+  );
+}
+
+export function updateLearningLevel(level) {
+  const learningLevel = validateLearningLevel(level);
+  // Supabase merges data into user_metadata; do not resend stale metadata or
+  // replace account fields such as username when changing this preference.
+  return unwrap(
+    requireClient().auth.updateUser({
+      data: { learning_level: learningLevel },
     }),
   );
 }

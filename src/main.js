@@ -4,6 +4,7 @@ import "./library.css";
 import { createStudyController } from "./study-ui.js";
 import { studyWords } from "./study.js";
 import { libraryPage, libraryMeaning } from "./library.js";
+import { accountLearningLevel } from "./account-level.js";
 import { readRoute, pagePath, LEARNING_LEVELS } from "./routes.js";
 import {
   makeDeck,
@@ -90,6 +91,7 @@ let queueGeneration = 0;
 let queueActive = false;
 let leaderRequest = 0;
 let dialog = null;
+let levelPromptUserId = null;
 const modes = {
   duel: {
     name: "Дуэль",
@@ -138,6 +140,7 @@ try {
   /* Optional storage. */
 }
 study.setLevel(selectedStudyLevel || "A1");
+state.wordLevel = study.getLevel();
 let pendingPage = "arena";
 
 function syncRoute(page, replace = false) {
@@ -232,6 +235,7 @@ function rating() {
     : null;
 }
 function learningShortcut() {
+  if (accountLearningLevel(state.user)) return renderLearningPreference();
   return `<section class="study-shortcut"><div class="study-shortcut-copy"><span class="study-kicker">A1–C1 · Start at your level</span><h2>Not just words.</h2><p>A place to practise before you compete. Flashcards, sentences and your own pace.</p><button class="button dark" data-page="study">Explore learning ${icons.arrow}</button></div>${study.mascot()}</section>`;
 }
 function renderWelcome() {
@@ -312,9 +316,50 @@ function wordCards(words) {
         .join("")
     : `<div class="empty-state"><h3>${escape(t("No matching words.", state.language))}</h3><p>${escape(t("Try a shorter search or a different level.", state.language))}</p></div>`;
 }
+function learningLevelField(selected = "") {
+  const h = (key) => escape(t(key, state.language));
+  const labels = [
+    "Beginner",
+    "Elementary",
+    "Intermediate",
+    "Upper intermediate",
+    "Advanced",
+  ];
+  return `<label class="account-level-label" data-no-i18n>${h("Your English level")}<select name="learning_level" required aria-label="${h("Your English level")}"><option value="" disabled ${selected ? "" : "selected"}>${h("Choose your level")}</option>${LEARNING_LEVELS.map((level, index) => `<option value="${level}" ${selected === level ? "selected" : ""}>${level} · ${h(labels[index])}</option>`).join("")}</select></label><p class="account-level-note" data-no-i18n>${h("Start at your level. No beginner lessons required. You can change this later.")}</p>`;
+}
+function renderLearningPreference() {
+  if (!state.user) return "";
+  const level = accountLearningLevel(state.user);
+  const h = (key) => escape(t(key, state.language));
+  return `<section class="account-learning" data-no-i18n><div><span class="study-kicker">${h("Your English level")}</span><h2>${level || h("Choose your level")}</h2><p>${h("Your account remembers your starting point for learning and the word library.")}</p><small>${h("Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.")}</small></div><div class="account-learning-actions"><button class="button outline" data-action="learning-level">${h(level ? "Change my level" : "Choose your level")}</button>${level ? `<button class="button dark" data-action="my-learning">${h("Continue learning")} ${escape(level)} ${icons.arrow}</button>` : ""}</div></section>`;
+}
+function showLearningLevel() {
+  modal(
+    `<div data-no-i18n><span class="eyebrow">YOUR STARTING POINT</span><h2>${escape(t("Start where you are.", state.language))}</h2><form id="learning-level-form">${learningLevelField(accountLearningLevel(state.user) || "")}<p class="account-level-note">${escape(t("Self-selected learning level, not a test result or match rating. Ranked battles currently support A1/A2 only.", state.language))}</p><p class="form-error" role="alert"></p><button type="submit" class="button dark full">${escape(t("Save and start learning", state.language))} ${icons.arrow}</button></form></div>`,
+  );
+}
+function offerLearningLevel() {
+  if (
+    !state.user ||
+    accountLearningLevel(state.user) ||
+    dialog ||
+    state.page === "game" ||
+    queueActive ||
+    levelPromptUserId === state.user.id
+  )
+    return;
+  levelPromptUserId = state.user.id;
+  showLearningLevel();
+}
+function applyLearningLevel(level) {
+  study.setLevel(level);
+  state.wordLevel = level;
+  state.wordPage = 1;
+  state.wordQuery = "";
+}
 function renderProfile() {
   const history = state.history;
-  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section><div class="stat-grid"><div><span>РЕЙТИНГ A1</span><strong>${state.profile?.rating_a1 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>РЕЙТИНГ A2</span><strong>${state.profile?.rating_a2 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
+  return `<section class="simple-intro"><span class="eyebrow">YOUR NEXT LEVEL</span><h1>Каждый шаг <span class="underlined">считается.</span></h1><p>Твои тренировки, результаты и рост.</p></section><section class="profile-summary">${avatar(state.profile?.username || t("Ты", state.language), "large")}<div><h2 data-no-i18n>${escape(state.profile?.username || t("Гость арены", state.language))}</h2><p>${state.user ? "Твой путь к новому уровню" : "Соло доступно без аккаунта. Для рейтинга — войди."}</p></div>${state.user ? '<button class="text-link" data-action="signout">Выйти ' + icons.exit + "</button>" : '<button class="button dark" data-action="auth">Создать аккаунт ' + icons.arrow + "</button>"}</section>${renderLearningPreference()}<div class="stat-grid"><div><span>РЕЙТИНГ A1</span><strong>${state.profile?.rating_a1 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>РЕЙТИНГ A2</span><strong>${state.profile?.rating_a2 ?? "—"}</strong><small>Дуэли и баттлы</small></div><div><span>ЛИЧНЫЙ РЕКОРД</span><strong>${history.length ? Math.max(...history.map((x) => x.score)) : "—"}</strong><small>Соло на этом устройстве</small></div></div><div class="section-heading"><h2>Последние тренировки</h2><button class="text-link" data-action="solo">Ещё одну ${icons.arrow}</button></div><div class="history-list">${
     history.length
       ? history
           .slice(0, 10)
@@ -358,6 +403,11 @@ function showAuth(signup = false) {
   modal(
     `<span class="eyebrow">WELCOME TO THE CLUB</span><h2>${signup ? "Твой первый шаг." : "Снова на арену."}</h2><p class="modal-sub">${online.isOnlineConfigured ? "Войди, чтобы соревноваться и сохранять рейтинг." : "Регистрация будет доступна после подключения Supabase. Соло и демо уже работают."}</p>${online.isOnlineConfigured ? `${googleOption}<form id="auth-form" data-signup="${signup}">${signup ? '<label>Никнейм<input name="username" required minlength="2" maxlength="24" placeholder="Например, wordhunter" autocomplete="nickname" /></label>' : ""}<label>Email<input type="email" name="email" required placeholder="you@example.com" autocomplete="email" /></label><label>Пароль<input type="password" name="password" required minlength="8" placeholder="Не менее 8 символов" autocomplete="${signup ? "new-password" : "current-password"}" /></label><p id="auth-error" class="form-error" role="alert"></p><button type="submit" class="button dark full">${signup ? "Создать аккаунт" : "Войти"} ${icons.arrow}</button></form><p class="auth-switch">${signup ? "Уже есть аккаунт?" : "Первый раз здесь?"} <button data-action="${signup ? "signin" : "signup"}">${signup ? "Войти" : "Зарегистрироваться"}</button></p>` : `<div class="connection-note">${icons.user}<p>Онлайн требует собственного проекта Supabase. Код регистрации, матчей и рейтинга уже подготовлен.</p></div><button class="button dark full" data-action="solo">Пока сыграть соло ${icons.arrow}</button>`}`,
   );
+  if (signup && online.isOnlineConfigured) {
+    const field = document.createElement("div");
+    field.innerHTML = learningLevelField(study.getLevel());
+    dialog.querySelector("#auth-error").before(field);
+  }
 }
 function showDemoChoice() {
   modal(
@@ -464,6 +514,12 @@ document.addEventListener("click", async (event) => {
   if (action === "rules") showRules();
   if (action === "auth" || action === "signin") showAuth();
   if (action === "signup") showAuth(true);
+  if (action === "learning-level" && state.user) showLearningLevel();
+  if (action === "my-learning") {
+    const level = accountLearningLevel(state.user);
+    if (level) applyLearningLevel(level);
+    navigate("study");
+  }
   if (action === "solo") {
     closeModal();
     startLocal("solo");
@@ -519,6 +575,31 @@ document.addEventListener("input", (event) => {
 });
 document.addEventListener("submit", async (event) => {
   if (study.submit(event)) return;
+  if (event.target.id === "learning-level-form") {
+    event.preventDefault();
+    const form = event.target;
+    const button = form.querySelector('button[type="submit"]');
+    const accountId = state.user?.id;
+    button.disabled = true;
+    form.querySelector(".form-error").textContent = "";
+    try {
+      const level = new FormData(form).get("learning_level");
+      const result = await online.updateLearningLevel(level);
+      if (!accountId || state.user?.id !== accountId) return;
+      state.user = result.user;
+      applyLearningLevel(accountLearningLevel(result.user));
+      closeModal();
+      navigate("study");
+      toast("Learning level saved.");
+    } catch (error) {
+      form.querySelector(".form-error").textContent = t(
+        error.message,
+        state.language,
+      );
+      button.disabled = false;
+    }
+    return;
+  }
   if (event.target.id === "answer-form") {
     event.preventDefault();
     submitCurrent();
@@ -536,6 +617,7 @@ document.addEventListener("submit", async (event) => {
           data.get("email"),
           data.get("password"),
           data.get("username"),
+          data.get("learning_level"),
         );
         if (!result?.session) {
           form.innerHTML =
@@ -548,7 +630,11 @@ document.addEventListener("submit", async (event) => {
       }
       await refreshUser();
       closeModal();
-      render();
+      if (accountLearningLevel(state.user)) navigate("study");
+      else {
+        render();
+        offerLearningLevel();
+      }
       toast("Ты в игре. Добро пожаловать!");
     } catch (error) {
       form.querySelector("#auth-error").textContent = t(
@@ -590,20 +676,34 @@ async function fetchLeaders() {
     }
   }
 }
-async function refreshUser() {
+async function refreshUser({ preserveLevel = false } = {}) {
+  const previousUser = state.user;
   state.user = (await online.getSession())?.user || null;
+  const level = accountLearningLevel(state.user);
+  if (
+    level &&
+    !preserveLevel &&
+    (previousUser?.id !== state.user.id ||
+      accountLearningLevel(previousUser) !== level)
+  ) {
+    applyLearningLevel(level);
+    if (state.page === "study") syncRoute("study", true);
+  }
   state.profile = state.user ? await online.getProfile() : null;
 }
 async function initialize() {
   render();
   if (online.isOnlineConfigured) {
     try {
-      await refreshUser();
+      await refreshUser({ preserveLevel: Boolean(initialRoute.level) });
       online.onAuthStateChange(() => {
         setTimeout(async () => {
           try {
             await refreshUser();
-            if (state.page !== "game") render();
+            if (state.page !== "game") {
+              render();
+              offerLearningLevel();
+            }
           } catch (error) {
             toast(error.message);
           }
@@ -614,6 +714,7 @@ async function initialize() {
     }
   }
   if (state.page !== "game") render();
+  offerLearningLevel();
 }
 function stopGame() {
   clearInterval(gameTimer);

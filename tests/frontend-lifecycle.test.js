@@ -108,6 +108,8 @@ function harness(functions, online = {}) {
     speak() {},
     tickOnline() {},
     refreshUser: async () => {},
+    offerLearningLevel() {},
+    initialRoute: { level: null },
     pollMatch: async () => {},
     startOnline() {},
     cancelQueue() {},
@@ -154,7 +156,11 @@ test("initial auth refresh does not replace a practice game started during loadi
   c.state.page = "game";
   auth.resolve();
   await loading;
-  assert.equal(c.renders, 1, "a live answer input is not recreated by late auth");
+  assert.equal(
+    c.renders,
+    1,
+    "a live answer input is not recreated by late auth",
+  );
 });
 
 test("completed results still render when refreshing the profile fails", async () => {
