@@ -49,6 +49,7 @@ const modelResponse = (value = plan()) =>
   });
 function harness(options = {}) {
   const calls = [];
+  const reports = [];
   const responses = options.responses || [
     json({ id: "user1" }),
     json(true),
@@ -57,6 +58,10 @@ function harness(options = {}) {
   const handler = createPlanHandler({
     env: options.env || env,
     timeoutMs: options.timeoutMs || 1000,
+    report: (event) => {
+      reports.push(event);
+      options.report?.(event);
+    },
     fetch: async (url, init) => {
       calls.push({ url, ...init });
       if (options.fetch) return options.fetch(url, init);
@@ -88,7 +93,7 @@ function harness(options = {}) {
     body: payload,
     ...options.req,
   };
-  return { calls, res, run: () => handler(req, res) };
+  return { calls, reports, res, run: () => handler(req, res) };
 }
 
 test("study plan request validates levels, consent, size and daily budget", () => {
@@ -235,10 +240,6 @@ test("upstream errors are sanitized and invalid or truncated model responses are
   const bad = plan();
   bad.level = "A1";
   for (const response of [
-    json(
-      { error: { message: "provider private message secret-test-only" } },
-      400,
-    ),
     modelResponse(bad),
     json({
       candidates: [
@@ -301,4 +302,113 @@ test("oversized model responses are rejected rather than forwarded", async () =>
   await h.run();
   assert.equal(h.res.code, 502);
   assert.deepEqual(h.res.data, { error: "generation_failed" });
+});
+
+test("provider configuration errors have owner-action code and whitelisted diagnostics only", async () => {
+  for (const status of [400, 401, 403, 404]) {
+    const h = harness({
+      responses: [
+        json({ id: "user1" }),
+        json(true),
+        json(
+          {
+            error: {
+              status: "PERMISSION_DENIED",
+              message: `raw-private-message ${env.GEMINI_API_KEY} ${token} ${payload.goal}`,
+              details: [
+                {
+                  reason: "API_KEY_SERVICE_BLOCKED",
+                  metadata: { key: env.GEMINI_API_KEY, goal: payload.goal },
+                },
+              ],
+            },
+          },
+          status,
+        ),
+      ],
+    });
+    await h.run();
+    assert.equal(h.res.code, 502);
+    assert.equal(h.res.data.error, "provider_configuration");
+    assert.deepEqual(h.reports, [
+      { stage: "provider", status, reason: "API_KEY_SERVICE_BLOCKED" },
+    ]);
+    const exposed = JSON.stringify([h.res.data, h.reports]);
+    for (const secret of [
+      env.GEMINI_API_KEY,
+      token,
+      payload.goal,
+      "raw-private-message",
+    ])
+      assert.ok(!exposed.includes(secret));
+  }
+  const unknown = harness({
+    responses: [
+      json({ id: "user1" }),
+      json(true),
+      json(
+        { error: { status: token, details: [{ reason: payload.goal }] } },
+        500,
+      ),
+    ],
+  });
+  await unknown.run();
+  assert.deepEqual(unknown.reports, [
+    { stage: "provider", status: 500, reason: "UNKNOWN" },
+  ]);
+});
+
+test("safe diagnostics distinguish auth, quota, parse and schema failures", async () => {
+  const auth = harness({ responses: [json({ private: token }, 500)] });
+  await auth.run();
+  assert.deepEqual(auth.reports, [
+    { stage: "auth", status: 500, reason: "UPSTREAM_HTTP" },
+  ]);
+  const quota = harness({
+    responses: [json({ id: "user1" }), json({ private: token }, 404)],
+  });
+  await quota.run();
+  assert.deepEqual(quota.reports, [
+    { stage: "quota", status: 404, reason: "UPSTREAM_HTTP" },
+  ]);
+  const parse = harness({
+    responses: [
+      json({ id: "user1" }),
+      json(true),
+      new Response("private-not-json"),
+    ],
+  });
+  await parse.run();
+  assert.deepEqual(parse.reports, [{ stage: "parse", reason: "INVALID_JSON" }]);
+  const value = plan();
+  value.level = token;
+  value.days[0].activities[0].minutes = 30;
+  const invalid = harness({
+    responses: [json({ id: "user1" }), json(true), modelResponse(value)],
+  });
+  await invalid.run();
+  assert.deepEqual(invalid.reports, [
+    {
+      stage: "validation",
+      reason: "INVALID_PLAN",
+      level: "INVALID",
+      dayCount: 7,
+      activityCounts: [1, 1, 1, 1, 1, 1, 1],
+      dailyMinutes: [30, 20, 20, 20, 20, 20, 20],
+      dailyBudget: 20,
+    },
+  ]);
+  assert.ok(!JSON.stringify(invalid.reports).includes(token));
+});
+
+test("diagnostic reporter exceptions never alter an otherwise safe API failure", async () => {
+  const h = harness({
+    report() {
+      throw new Error("logging unavailable");
+    },
+    responses: [json({ id: "user1" }), json(false)],
+  });
+  await h.run();
+  assert.equal(h.res.code, 429);
+  assert.equal(h.res.data.error, "daily_limit");
 });

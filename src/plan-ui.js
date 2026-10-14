@@ -4,6 +4,8 @@ import { PLAN_LEVELS, validatePlan, validatePlanRequest } from "./plan.js";
 const ERROR_COPY = {
   ai_not_configured:
     "Gemini is not connected yet. The site owner needs to add the server API key. Your current learning tools still work.",
+  provider_configuration:
+    "Google rejected the Gemini configuration. The site owner needs to check the API key, model access and Google project settings.",
   daily_limit:
     "Your account or the site has reached today’s plan limit. Try again after 00:00 UTC.",
   provider_busy:

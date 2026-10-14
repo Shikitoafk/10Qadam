@@ -1,4 +1,10 @@
 export const PLAN_COPY = {
+  "Google rejected the Gemini configuration. The site owner needs to check the API key, model access and Google project settings.":
+    [
+      "Google rejected the Gemini configuration. The site owner needs to check the API key, model access and Google project settings.",
+      "Google Gemini баптауларын қабылдамады. Сайт иесі API кілтін, модельге қолжетімділікті және Google жобасының баптауларын тексеруі керек.",
+      "Google отклонил настройки Gemini. Владельцу сайта нужно проверить API-ключ, доступ к модели и настройки проекта Google.",
+    ],
   "10Qadam — your study plan": [
     "10Qadam — your study plan",
     "10Qadam — жеке оқу жоспарың",

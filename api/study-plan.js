@@ -3,6 +3,75 @@ import { PLAN_SCHEMA, validatePlan, validatePlanRequest } from "../src/plan.js";
 export const config = { maxDuration: 30 };
 const MAX_BODY = 4096;
 const MAX_RESPONSE = 65536;
+const PROVIDER_REASONS = new Set([
+  "API_KEY_INVALID",
+  "API_KEY_EXPIRED",
+  "API_KEY_SERVICE_BLOCKED",
+  "API_KEY_HTTP_REFERRER_BLOCKED",
+  "API_KEY_IP_ADDRESS_BLOCKED",
+  "SERVICE_DISABLED",
+  "BILLING_DISABLED",
+  "CONSUMER_INVALID",
+  "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+  "RESOURCE_EXHAUSTED",
+  "INVALID_ARGUMENT",
+  "PERMISSION_DENIED",
+  "NOT_FOUND",
+  "UNAUTHENTICATED",
+  "UNAVAILABLE",
+  "INTERNAL",
+  "DEADLINE_EXCEEDED",
+]);
+const FINISH_REASONS = new Set([
+  "STOP",
+  "MAX_TOKENS",
+  "SAFETY",
+  "RECITATION",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "SPII",
+  "MALFORMED_FUNCTION_CALL",
+  "OTHER",
+]);
+
+function providerReason(body) {
+  const details = Array.isArray(body?.error?.details) ? body.error.details : [];
+  for (const detail of details) {
+    if (PROVIDER_REASONS.has(detail?.reason)) return detail.reason;
+  }
+  return PROVIDER_REASONS.has(body?.error?.status)
+    ? body.error.status
+    : "UNKNOWN";
+}
+
+function planMetadata(value, dailyMinutes) {
+  const days = Array.isArray(value?.days) ? value.days : [];
+  const totals = days.slice(0, 7).map((day) => {
+    if (!Array.isArray(day?.activities)) return -1;
+    return day.activities.slice(0, 4).reduce((sum, activity) => {
+      const minutes = activity?.minutes;
+      return sum < 0 ||
+        !Number.isInteger(minutes) ||
+        minutes < 1 ||
+        minutes > 90
+        ? -1
+        : sum + minutes;
+    }, 0);
+  });
+  return {
+    level: ["A1", "A2", "B1", "B2", "C1"].includes(value?.level)
+      ? value.level
+      : "INVALID",
+    dayCount: days.length,
+    activityCounts: days
+      .slice(0, 7)
+      .map((day) =>
+        Array.isArray(day?.activities) ? day.activities.length : -1,
+      ),
+    dailyMinutes: totals,
+    dailyBudget: dailyMinutes,
+  };
+}
 
 async function readJSON(response) {
   if (Number(response.headers?.get?.("content-length")) > MAX_RESPONSE)
@@ -57,11 +126,21 @@ export function createPlanHandler({
   env = process.env,
   fetch: fetcher = globalThis.fetch,
   timeoutMs = 25000,
+  report = (event) => console.warn("study_plan", event),
 } = {}) {
   return async function handler(req, res) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
     const reply = (status, code) => res.status(status).json({ error: code });
+    // Only call with fixed enums/statuses and bounded numeric schema metadata.
+    // Never log an Error object, provider message, auth token or learner text.
+    const diagnostic = (event) => {
+      try {
+        report(event);
+      } catch {
+        /* Diagnostics must not affect the response. */
+      }
+    };
     if (req.method !== "POST") {
       res.setHeader("Allow", "POST");
       return reply(405, "method_not_allowed");
@@ -102,19 +181,29 @@ export function createPlanHandler({
       Authorization: authorization,
       "Content-Type": "application/json",
     };
+    let stage = "auth";
     try {
       const userResponse = await fetcher(
         `${supabase.replace(/\/$/, "")}/auth/v1/user`,
         { headers, signal: controller.signal },
       );
+      if (!userResponse.ok)
+        diagnostic({
+          stage: "auth",
+          status: userResponse.status,
+          reason: "UPSTREAM_HTTP",
+        });
       if ([401, 403].includes(userResponse.status))
         return reply(401, "sign_in_required");
       if (!userResponse.ok) return reply(503, "ai_unavailable");
       const user = await readJSON(userResponse);
-      if (!user?.id || user.is_anonymous === true)
+      if (!user?.id || user.is_anonymous === true) {
+        diagnostic({ stage: "auth", reason: "INVALID_USER" });
         return reply(401, "sign_in_required");
+      }
       // Durable atomic quota in Supabase, never a per-process memory counter.
       // Failed model attempts count too; a broken/missing quota fails closed.
+      stage = "quota";
       const quotaResponse = await fetcher(
         `${supabase.replace(/\/$/, "")}/rest/v1/rpc/consume_plan_quota`,
         {
@@ -124,10 +213,24 @@ export function createPlanHandler({
           signal: controller.signal,
         },
       );
-      if (!quotaResponse.ok) return reply(503, "ai_unavailable");
+      if (!quotaResponse.ok) {
+        diagnostic({
+          stage: "quota",
+          status: quotaResponse.status,
+          reason: "UPSTREAM_HTTP",
+        });
+        return reply(503, "ai_unavailable");
+      }
       const permitted = await readJSON(quotaResponse);
-      if (permitted === false) return reply(429, "daily_limit");
-      if (permitted !== true) return reply(503, "ai_unavailable");
+      if (permitted === false) {
+        diagnostic({ stage: "quota", reason: "DAILY_LIMIT" });
+        return reply(429, "daily_limit");
+      }
+      if (permitted !== true) {
+        diagnostic({ stage: "quota", reason: "INVALID_QUOTA_RESPONSE" });
+        return reply(503, "ai_unavailable");
+      }
+      stage = "provider";
       const response = await fetcher(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
@@ -171,27 +274,62 @@ export function createPlanHandler({
           }),
         },
       );
-      if (!response.ok)
+      if (!response.ok) {
+        let reason = "UNKNOWN";
+        try {
+          reason = providerReason(await readJSON(response));
+        } catch {
+          /* Discard malformed/oversized error body. */
+        }
+        diagnostic({ stage: "provider", status: response.status, reason });
+        const misconfigured = [400, 401, 403, 404].includes(response.status);
         return reply(
           response.status === 429 ? 429 : 502,
-          response.status === 429 ? "provider_busy" : "generation_failed",
+          response.status === 429
+            ? "provider_busy"
+            : misconfigured
+              ? "provider_configuration"
+              : "generation_failed",
         );
+      }
+      stage = "parse";
       const body = await readJSON(response);
       const candidate = body?.candidates?.[0];
-      if (candidate?.finishReason !== "STOP")
+      if (candidate?.finishReason !== "STOP") {
+        diagnostic({
+          stage: "parse",
+          reason: "INCOMPLETE_OUTPUT",
+          finishReason: FINISH_REASONS.has(candidate?.finishReason)
+            ? candidate.finishReason
+            : "UNKNOWN",
+        });
         return reply(502, "generation_failed");
+      }
       const output = candidate.content?.parts
         ?.filter((part) => typeof part.text === "string" && !part.thought)
         .map((part) => part.text)
         .join("");
-      const plan = validatePlan(
-        JSON.parse(output || "null"),
-        input.level,
-        input.minutes,
-      );
-      if (!plan) return reply(502, "generation_failed");
+      const decoded = JSON.parse(output || "null");
+      stage = "validation";
+      const plan = validatePlan(decoded, input.level, input.minutes);
+      if (!plan) {
+        diagnostic({
+          stage: "validation",
+          reason: "INVALID_PLAN",
+          ...planMetadata(decoded, input.minutes),
+        });
+        return reply(502, "generation_failed");
+      }
       return res.status(200).json({ plan });
     } catch {
+      diagnostic({
+        stage,
+        reason: controller.signal.aborted
+          ? "TIMEOUT"
+          : stage === "parse"
+            ? "INVALID_JSON"
+            : "NETWORK_OR_RESPONSE_ERROR",
+      });
       return reply(
         controller.signal.aborted ? 504 : 502,
         controller.signal.aborted ? "generation_timeout" : "generation_failed",
