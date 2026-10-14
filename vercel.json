@@ -2,6 +2,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "rewrites": [
+    { "source": "/learn/:path*", "destination": "/index.html" },
+    { "source": "/arena", "destination": "/index.html" },
+    { "source": "/words", "destination": "/index.html" },
+    { "source": "/leaderboard", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

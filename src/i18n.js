@@ -1,8 +1,10 @@
 // The existing UI copy is the source catalogue. Translate only text and labels,
 // never HTML, user names, submitted answers or English spelling challenges.
+import { STUDY_COPY } from "./study-copy.js";
 export const LANGUAGES = ["en", "kk", "ru"];
 export const LOCALES = { en: "en-GB", kk: "kk-KZ", ru: "ru-RU" };
 export const COPY = {
+  ...STUDY_COPY,
   Арена: ["Arena", "Арена"],
   Рейтинг: ["Leaderboard", "Рейтинг"],
   Словарь: ["Word bank", "Сөздік"],

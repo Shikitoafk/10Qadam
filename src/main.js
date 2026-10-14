@@ -1,4 +1,7 @@
 import "./style.css";
+import "./study.css";
+import { createStudyController } from "./study-ui.js";
+import { readRoute, pagePath, LEARNING_LEVELS } from "./routes.js";
 import {
   WORDS,
   makeDeck,
@@ -33,6 +36,9 @@ const icons = {
   book: svg(
     '<path d="M12 5v15M12 5C9 2 4 3 3 4v15c4-2 7-1 9 1 2-2 5-3 9-1V4c-1-1-6-2-9 1Z"/>',
   ),
+  cards: svg(
+    '<rect x="7" y="7" width="13" height="14" rx="2"/><path d="M16 7V3H3v14h4m4-5h5m-5 4h3"/>',
+  ),
   user: svg(
     '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
   ),
@@ -61,8 +67,9 @@ const escape = (value) =>
         x
       ],
   );
+const initialRoute = readRoute(window.location.pathname);
 const state = {
-  page: "arena",
+  page: initialRoute.page,
   language: loadLanguage(),
   level: "A1",
   mode: "duel",
@@ -107,6 +114,42 @@ const modes = {
     color: "cream",
   },
 };
+const study = createStudyController({
+  language: () => state.language,
+  escape,
+  icons,
+  speak,
+  render,
+  openLevel: (level) => {
+    if (state.page === "game" && state.match && !state.match.finished) return;
+    study.setLevel(level);
+    navigate("study");
+  },
+});
+let selectedStudyLevel = initialRoute.level;
+try {
+  selectedStudyLevel ||= localStorage.getItem("10qadam-study-level");
+} catch {
+  /* Optional storage. */
+}
+study.setLevel(selectedStudyLevel || "A1");
+let pendingPage = "arena";
+
+function syncRoute(page, replace = false) {
+  const path = pagePath(page === "game" ? "arena" : page, study.getLevel());
+  if (window.location.pathname !== path)
+    window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+}
+window.addEventListener("popstate", () => {
+  const route = readRoute(window.location.pathname);
+  stopGame();
+  study.stop();
+  if (route.level) study.setLevel(route.level);
+  state.page = route.page;
+  render();
+  window.scrollTo(0, 0);
+  if (state.page === "leaders") fetchLeaders();
+});
 function toast(message) {
   document.querySelector(".toast")?.remove();
   const element = document.createElement("div");
@@ -124,7 +167,7 @@ function navItem(page, label, icon) {
   return `<button class="nav-item ${state.page === page ? "active" : ""}" data-page="${page}" aria-label="${label}" ${state.page === page ? 'aria-current="page"' : ""}>${icons[icon]}<span>${label}</span>${state.page === page ? '<span class="nav-dot"></span>' : ""}</button>`;
 }
 function shell(content) {
-  return `<aside class="sidebar"><a class="brand" href="#" aria-label="10Qadam, главная"><span class="brand-mark" role="img" aria-label="Логотип 10Qadam"></span><span>10Qadam<span class="brand-sub">THE SPELLING ARENA</span></span></a><div class="nav-label">PLAYGROUND</div><nav aria-label="Главная навигация">${navItem("arena", "Арена", "arena")}${navItem("leaders", "Рейтинг", "chart")}${navItem("words", "Словарь", "book")}${navItem("profile", "Мой профиль", "user")}</nav><div class="sidebar-bottom"><div class="mini-note"><p>Маленькие шаги.<br><strong>Большой словарный запас.</strong></p></div><span class="side-version">MADE FOR YOUR NEXT LEVEL ↗</span></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">PLAYGROUND <span>/</span> ${escape({ arena: "Арена", leaders: "Рейтинг", words: "Словарь", profile: "Профиль", game: "Матч" }[state.page] || "Арена")}</div><div class="top-actions"><select id="language-select" aria-label="Language" title="Language">${[
+  return `<aside class="sidebar"><a class="brand" href="#" aria-label="10Qadam, главная"><span class="brand-mark" role="img" aria-label="Логотип 10Qadam"></span><span>10Qadam<span class="brand-sub">THE SPELLING ARENA</span></span></a><div class="nav-label">PLAYGROUND</div><nav aria-label="Главная навигация">${navItem("arena", "Арена", "arena")}${navItem("study", "Учиться", "cards")}${navItem("leaders", "Рейтинг", "chart")}${navItem("words", "Словарь", "book")}${navItem("profile", "Мой профиль", "user")}</nav><div class="sidebar-bottom"><div class="mini-note"><p>Маленькие шаги.<br><strong>Большой словарный запас.</strong></p></div><span class="side-version">MADE FOR YOUR NEXT LEVEL ↗</span></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">PLAYGROUND <span>/</span> ${escape({ arena: "Арена", leaders: "Рейтинг", words: "Словарь", profile: "Профиль", game: "Матч", study: "Учиться", welcome: "Знакомство" }[state.page] || "Арена")}</div><div class="top-actions"><select id="language-select" aria-label="Language" title="Language">${[
     ["en", "EN"],
     ["kk", "KZ"],
     ["ru", "RU"],
@@ -139,6 +182,8 @@ function shell(content) {
 }
 function render() {
   const pages = {
+    welcome: renderWelcome,
+    study: () => study.render(),
     arena: renderArena,
     leaders: renderLeaders,
     words: renderWords,
@@ -148,13 +193,28 @@ function render() {
   app.innerHTML = shell((pages[state.page] || renderArena)());
   localize(app, state.language);
   document.documentElement.lang = state.language;
-  document.title = t("10Qadam — English spelling arena", state.language);
+  const canonical = document.querySelector('link[rel="canonical"]');
+  if (canonical)
+    canonical.href = new URL(
+      pagePath(state.page === "game" ? "arena" : state.page, study.getLevel()),
+      canonical.href,
+    ).href;
+  document.title = t(
+    state.page === "welcome"
+      ? "10Qadam — learn English at your level"
+      : state.page === "study"
+        ? "10Qadam — your learning space"
+        : "10Qadam — English spelling arena",
+    state.language,
+  );
   document
     .querySelector('meta[name="description"]')
     ?.setAttribute(
       "content",
       t(
-        "Listen, spell and compete. English A1/A2 practice, duels and four-player battles.",
+        state.page === "welcome" || state.page === "study"
+          ? "Start English at your level, A1 to C1. Learn with flashcards and sentence dictation, then join the spelling arena."
+          : "Listen, spell and compete. English A1/A2 practice, duels and four-player battles.",
         state.language,
       ),
     );
@@ -166,10 +226,44 @@ function rating() {
     ? ((state.level === "A1" ? p.rating_a1 : p.rating_a2) ?? 1000)
     : null;
 }
+function learningShortcut() {
+  return `<section class="study-shortcut"><div class="study-shortcut-copy"><span class="study-kicker">A1–C1 · Start at your level</span><h2>Not just words.</h2><p>A place to practise before you compete. Flashcards, sentences and your own pace.</p><button class="button dark" data-page="study">Explore learning ${icons.arrow}</button></div>${study.mascot()}</section>`;
+}
+function renderWelcome() {
+  const tr = (key) => escape(t(key, state.language));
+  const levels = [
+    ["A1", "Beginner", "Everyday words. Your first sentences."],
+    ["A2", "Elementary", "Build confidence in familiar situations."],
+    ["B1", "Intermediate", "Express ideas and connect your thoughts."],
+    ["B2", "Upper intermediate", "More precise words. More complex ideas."],
+    ["C1", "Advanced", "Nuance, detail and fluent expression."],
+  ];
+  return `<div data-no-i18n><section class="welcome-hero"><div class="welcome-intro"><span class="study-kicker">10QADAM / ${tr("WHY 10QADAM")}</span><h1>${escape(slogan(state.language)[0])}<br><span class="underlined">${escape(slogan(state.language)[1])}</span></h1><p>${tr("Start where you are. Learn words, listen to real sentences and take your spelling to the arena.")}</p><a class="button dark" href="#choose-level">${tr("Choose your starting point")} ${icons.arrow}</a><button class="text-link" data-page="arena">${tr("Go to the arena")} ${icons.arrow}</button></div><div class="welcome-companion"><span class="study-kicker">${tr("A little practice. A bigger world.")}</span>${study.mascot()}<span class="welcome-note">${tr("Your level is a starting point, not a label.")}</span></div></section>
+  <section class="welcome-header" id="choose-level"><div><span class="study-kicker">${tr("Not another course to start over.")}</span><h2>${tr("Choose your starting point")}</h2><p>${tr("No placement test. No locked levels. You can switch at any time.")}</p></div></section><div class="welcome-level-grid">${levels.map(([level, label, description]) => `<a class="welcome-level-card" href="/learn/${level}" data-study-level="${level}"><strong>${level}</strong><h3>${tr(label)}</h3><p>${tr(description)}</p><span>${icons.arrow}</span></a>`).join("")}</div><p class="study-meta">${tr("Practice collections, not a certified CEFR assessment.")}</p>
+  <section class="welcome-header"><span class="study-kicker">${tr("HOW IT WORKS")}</span><h2>${tr("English, one confident step at a time.")}</h2></section><div class="welcome-steps">${[
+    ["01", "Meet a word", "Flip a card, hear the word and make it yours."],
+    [
+      "02",
+      "Hear the whole thought",
+      "Type a short sentence. See exactly where you can improve.",
+    ],
+    [
+      "03",
+      "Put it into play",
+      "Ready for a challenge? Join an A1 or A2 spelling match.",
+    ],
+  ]
+    .map(
+      ([n, title, description]) =>
+        `<article><span class="study-kicker">${n}</span><h3>${tr(title)}</h3><p>${tr(description)}</p></article>`,
+    )
+    .join("")}</div></div>`;
+}
 function renderArena() {
   const personal = state.history;
   return `<section class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> <span data-no-i18n>10QADAM —</span></div><h1 data-no-i18n>${slogan(state.language)[0]}<br><span class="underlined">${slogan(state.language)[1]}</span></h1><p>Английский на слух. Баттлы на скорость.<br>Десять слов, чтобы стать чуть лучше.</p></div><div class="intro-stamp"><span>LISTEN</span><span class="stamp-cross">×</span><span>TYPE</span><span class="stamp-cross">×</span><span>WIN</span><i>↗</i></div></section>
   <section class="hero-arena" aria-label="Соревнование по spelling"><div class="hero-copy"><span class="pill">${icons.bolt} ТВОЯ СЛЕДУЮЩАЯ ПОБЕДА</span><h2>Включай звук.<br>Выключай сомнения.</h2><p>Слово прозвучало. Таймер пошёл.<br>Кто напишет правильно первым?</p><button class="button light" data-action="quick-play">Выйти на арену ${icons.arrow}</button><div class="hero-meta"><span>10 СЛОВ</span><i></i><span>12 СЕК / СЛОВО</span><i></i><span>A1 — A2</span></div></div><div class="hero-visual" aria-hidden="true"><div class="visual-grid"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="floating-label">EVERY LETTER COUNTS</span><div class="letter-tile tile-s">S<span>01</span></div><div class="letter-tile tile-p">P<span>02</span></div><div class="letter-tile tile-e">E<span>03</span></div><div class="letter-tile tile-l">L<span>04</span></div><div class="letter-tile tile-l2">L<span>05</span></div><div class="visual-score"><span class="score-check">${icons.check}</span><div>THAT'S CORRECT.<small>+100 accuracy &nbsp; +42 speed</small></div></div><div class="visual-corner">01:24 <span>● REC</span></div></div></section>
+  ${learningShortcut()}
   <section class="mode-section"><div class="section-heading"><div><span class="eyebrow small">PICK YOUR BATTLE</span><h2>Как играем?</h2></div><div class="level-select" aria-label="Уровень английского"><span>Уровень слов</span><div role="group">${["A1", "A2"].map((l) => `<button data-level="${l}" class="${state.level === l ? "selected" : ""}" aria-pressed="${state.level === l}">${l}</button>`).join("")}</div></div></div><div class="mode-grid">${Object.entries(
     modes,
   )
@@ -267,6 +361,7 @@ function speak(word) {
 }
 
 document.addEventListener("change", (event) => {
+  if (study.change(event)) return;
   if (event.target.id !== "language-select") return;
   const answer = document.querySelector("#answer");
   const typed = answer?.value;
@@ -298,11 +393,18 @@ function renderFilteredWords(query) {
 }
 
 document.addEventListener("click", async (event) => {
-  const el = event.target.closest("button,a.brand,a.footer-brand");
+  const el = event.target.closest(
+    "button,a.brand,a.footer-brand,a[data-study-level]",
+  );
   if (!el) return;
+  if (el.dataset.studyAction || el.dataset.studyLevel) {
+    event.preventDefault();
+    study.action(el);
+    return;
+  }
   if (el.matches("a.brand,a.footer-brand")) {
     event.preventDefault();
-    navigate("arena");
+    navigate("welcome");
     return;
   }
   if (el.dataset.page) {
@@ -344,7 +446,7 @@ document.addEventListener("click", async (event) => {
   if (action === "confirm-leave") {
     closeModal();
     stopGame();
-    navigate("arena");
+    navigate(pendingPage);
   }
   if (action === "cancel-queue") {
     await cancelQueue();
@@ -377,11 +479,13 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("input", (event) => {
+  study.input(event);
   if (event.target.id === "word-search") {
     renderFilteredWords(event.target.value);
   }
 });
 document.addEventListener("submit", async (event) => {
+  if (study.submit(event)) return;
   if (event.target.id === "answer-form") {
     event.preventDefault();
     submitCurrent();
@@ -424,10 +528,13 @@ document.addEventListener("submit", async (event) => {
 });
 function navigate(page) {
   if (state.match && !state.match.finished && state.page === "game") {
+    pendingPage = page;
     showLeave();
     return;
   }
+  if (state.page === "study" && page !== "study") study.stop();
   state.page = page;
+  syncRoute(page);
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (page === "leaders") fetchLeaders();
@@ -490,6 +597,7 @@ function play() {
   else startQueue();
 }
 function startLocal(mode) {
+  study.stop();
   stopGame();
   closeModal();
   state.mode = mode;
@@ -520,6 +628,7 @@ function startLocal(mode) {
     finished: false,
   };
   state.page = "game";
+  syncRoute("arena");
   render();
   window.scrollTo(0, 0);
   gameTimer = setInterval(tickLocal, 100);
@@ -852,6 +961,7 @@ async function cancelQueue() {
   }
 }
 async function startOnline(id) {
+  study.stop();
   queueActive = false;
   closeModal();
   const m = (state.match = {

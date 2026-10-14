@@ -1,6 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { speakWord, stopSpeech } from "../src/speech.js";
+import {
+  getSpeechSettings,
+  listEnglishVoices,
+  saveSpeechSettings,
+  speakWord,
+  stopSpeech,
+} from "../src/speech.js";
+
+function memoryStorage(initial) {
+  let value = initial ?? null;
+  return {
+    getItem: () => value,
+    setItem: (_key, next) => {
+      value = next;
+    },
+  };
+}
+
+function browserStorage(t, storage) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete globalThis.localStorage;
+  });
+}
 
 function browser(t, voices = []) {
   const previousWindow = globalThis.window;
@@ -172,4 +200,142 @@ test("empty words cancel stale speech without queueing meaningless audio", async
   assert.equal(await speakWord("  "), false);
   assert.equal(synth.spoken.length, 1);
   assert.equal(synth.cancelCount, 2);
+});
+
+test("speech settings persist, merge partial updates, and reject invalid fields", () => {
+  const storage = memoryStorage();
+  assert.deepEqual(getSpeechSettings(storage), {
+    rate: 0.86,
+    voiceURI: "auto",
+  });
+  assert.deepEqual(
+    saveSpeechSettings({ rate: 0.7, voiceURI: "English voice" }, storage),
+    {
+      rate: 0.7,
+      voiceURI: "English voice",
+    },
+  );
+  saveSpeechSettings({ rate: 1.1 }, storage);
+  assert.deepEqual(getSpeechSettings(storage), {
+    rate: 1.1,
+    voiceURI: "English voice",
+  });
+  for (const rate of [0.64, 1.11, NaN, Infinity, "0.7", null]) {
+    saveSpeechSettings({ rate, voiceURI: "\ninvalid" }, storage);
+  }
+  saveSpeechSettings({ voiceURI: "x".repeat(513) }, storage);
+  saveSpeechSettings({ voiceURI: "" }, storage);
+  assert.deepEqual(getSpeechSettings(storage), {
+    rate: 1.1,
+    voiceURI: "English voice",
+  });
+  saveSpeechSettings({ rate: 0.65, voiceURI: "auto" }, storage);
+  assert.deepEqual(getSpeechSettings(storage), {
+    rate: 0.65,
+    voiceURI: "auto",
+  });
+});
+
+test("malformed and inaccessible storage use safe defaults", (t) => {
+  for (const initial of [
+    "{broken",
+    "null",
+    "[]",
+    '"string"',
+    '{"rate":9,"voiceURI":42}',
+  ]) {
+    assert.deepEqual(getSpeechSettings(memoryStorage(initial)), {
+      rate: 0.86,
+      voiceURI: "auto",
+    });
+  }
+  const inaccessible = {
+    getItem() {
+      throw new Error("Storage blocked");
+    },
+    setItem() {
+      throw new Error("Storage blocked");
+    },
+  };
+  assert.deepEqual(getSpeechSettings(inaccessible), {
+    rate: 0.86,
+    voiceURI: "auto",
+  });
+  assert.deepEqual(saveSpeechSettings({ rate: 0.7 }, inaccessible), {
+    rate: 0.7,
+    voiceURI: "auto",
+  });
+  browserStorage(t, null);
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() {
+      throw new Error("SecurityError");
+    },
+  });
+  assert.deepEqual(getSpeechSettings(), { rate: 0.86, voiceURI: "auto" });
+  assert.doesNotThrow(() => saveSpeechSettings({ rate: 1 }));
+});
+
+test("lists only English voice metadata in quality order and handles unsupported browsers", (t) => {
+  const synth = browser(t, [
+    { ...british, voiceURI: "gb" },
+    { name: "Russian", lang: "ru-RU", voiceURI: "ru" },
+    { ...natural, voiceURI: "natural" },
+    { ...british, voiceURI: "gb" },
+  ]);
+  assert.deepEqual(listEnglishVoices(), [
+    { name: natural.name, lang: "en-US", voiceURI: "natural" },
+    { name: british.name, lang: "en-GB", voiceURI: "gb" },
+  ]);
+  synth.getVoices = () => {
+    throw new Error("Unavailable");
+  };
+  assert.deepEqual(listEnglishVoices(), []);
+  delete globalThis.window.speechSynthesis;
+  assert.deepEqual(listEnglishVoices(), []);
+});
+
+test("uses a saved English voice and speed with a validated per-call speed override", async (t) => {
+  const gb = { ...british, voiceURI: "gb" };
+  const synth = browser(t, [gb, { ...natural, voiceURI: "natural" }]);
+  browserStorage(t, memoryStorage());
+  saveSpeechSettings({ voiceURI: "gb", rate: 0.7 });
+  await speakWord("The garden is quiet.");
+  assert.equal(synth.spoken[0].voice, gb);
+  assert.equal(synth.spoken[0].rate, 0.7);
+  assert.equal(synth.spoken[0].text, "The garden is quiet.");
+  await speakWord("apple", { rate: 1 });
+  assert.equal(synth.spoken[1].rate, 1);
+  await speakWord("apple", { rate: 5 });
+  assert.equal(synth.spoken[2].rate, 0.7);
+  assert.equal(getSpeechSettings().rate, 0.7);
+});
+
+test("missing or non-English saved voices fall back to the clearest English voice", async (t) => {
+  const best = { ...natural, voiceURI: "natural" };
+  const synth = browser(t, [
+    best,
+    { name: "Russian", lang: "ru-RU", voiceURI: "ru" },
+  ]);
+  browserStorage(t, memoryStorage());
+  for (const voiceURI of ["missing", "ru", "auto"]) {
+    saveSpeechSettings({ voiceURI });
+    await speakWord("flower");
+    assert.equal(synth.spoken.at(-1).voice, best);
+  }
+});
+
+test("delayed voice loading respects the saved preference and removes its listener", async (t) => {
+  const synth = browser(t);
+  browserStorage(t, memoryStorage());
+  saveSpeechSettings({ voiceURI: "gb", rate: 0.65 });
+  const pending = speakWord("school");
+  const gb = { ...british, voiceURI: "gb" };
+  synth.voices = [gb, { ...natural, voiceURI: "natural" }];
+  synth.dispatchEvent(new Event("voiceschanged"));
+  assert.equal(await pending, true);
+  assert.equal(synth.spoken[0].voice, gb);
+  assert.equal(synth.spoken[0].rate, 0.65);
+  synth.dispatchEvent(new Event("voiceschanged"));
+  assert.equal(synth.spoken.length, 1);
 });

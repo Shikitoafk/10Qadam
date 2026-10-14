@@ -43,6 +43,8 @@ function harness(functions, online = {}) {
   const feedback = { className: "", textContent: "" };
   const context = {
     t,
+    study: { stop() {} },
+    syncRoute() {},
     online,
     state: {
       mode: "duel",

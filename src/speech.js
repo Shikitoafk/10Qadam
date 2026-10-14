@@ -1,8 +1,57 @@
 // Use native English voices regardless of the interface language.
 const VOICE_LOAD_TIMEOUT_MS = 700;
+const SETTINGS_KEY = "10qadam-speech";
+const DEFAULT_SETTINGS = { rate: 0.86, voiceURI: "auto" };
 let requestId = 0;
 let pendingVoiceLoad = null;
 let activeUtterance = null;
+
+function storageOrDefault(storage) {
+  try {
+    return storage === undefined ? globalThis.localStorage : storage;
+  } catch {
+    return null;
+  }
+}
+
+function validSettings(value, base = DEFAULT_SETTINGS) {
+  const result = { ...base };
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return result;
+  if (Number.isFinite(value.rate) && value.rate >= 0.65 && value.rate <= 1.1) {
+    result.rate = value.rate;
+  }
+  if (
+    typeof value.voiceURI === "string" &&
+    value.voiceURI.trim() &&
+    value.voiceURI.length <= 512 &&
+    !/[\u0000-\u001f\u007f]/.test(value.voiceURI)
+  ) {
+    result.voiceURI = value.voiceURI.trim();
+  }
+  return result;
+}
+
+export function getSpeechSettings(storage) {
+  try {
+    return validSettings(
+      JSON.parse(storageOrDefault(storage)?.getItem(SETTINGS_KEY) ?? "null"),
+    );
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+/** Invalid fields leave the current setting unchanged; blocked storage is safe. */
+export function saveSpeechSettings(patch, storage) {
+  const settings = validSettings(patch, getSpeechSettings(storage));
+  try {
+    storageOrDefault(storage)?.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // Private browsing and storage restrictions must not break the game.
+  }
+  return settings;
+}
 
 function voiceQuality(voice) {
   const name = voice.name || "";
@@ -14,13 +63,49 @@ function voiceQuality(voice) {
   );
 }
 
-function englishVoice(synth) {
+function englishVoices(synth) {
   return [...synth.getVoices()]
     .filter((voice) => /^en(?:[-_]|$)/i.test(voice.lang || ""))
-    .sort((a, b) => voiceQuality(b) - voiceQuality(a))[0];
+    .sort((a, b) => voiceQuality(b) - voiceQuality(a));
 }
 
-function waitForEnglishVoice(synth) {
+/** Plain metadata only: native voice objects stay inside the speech module. */
+export function listEnglishVoices() {
+  try {
+    const synth = globalThis.window?.speechSynthesis;
+    if (!synth) return [];
+    const seen = new Set();
+    return englishVoices(synth).flatMap((voice) => {
+      if (
+        typeof voice.voiceURI !== "string" ||
+        !voice.voiceURI ||
+        seen.has(voice.voiceURI)
+      )
+        return [];
+      seen.add(voice.voiceURI);
+      return [
+        {
+          voiceURI: voice.voiceURI,
+          name: String(voice.name || voice.voiceURI),
+          lang: String(voice.lang),
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function englishVoice(synth, preferredURI) {
+  const voices = englishVoices(synth);
+  return (
+    voices.find(
+      (voice) => preferredURI !== "auto" && voice.voiceURI === preferredURI,
+    ) || voices[0]
+  );
+}
+
+function waitForEnglishVoice(synth, preferredURI) {
   return new Promise((resolve) => {
     let timeout;
     let finished = false;
@@ -34,7 +119,7 @@ function waitForEnglishVoice(synth) {
     }
     function checkVoices() {
       try {
-        const voice = englishVoice(synth);
+        const voice = englishVoice(synth, preferredURI);
         if (voice) finish(voice);
       } catch {
         finish(null);
@@ -63,8 +148,9 @@ export function stopSpeech() {
 }
 
 /** Queue one word. onError receives a translatable, stable error code. */
-export function speakWord(word, { onError } = {}) {
+export function speakWord(word, { onError, rate } = {}) {
   stopSpeech();
+  const settings = validSettings({ rate }, getSpeechSettings());
   const currentRequest = requestId;
   const synth = globalThis.window?.speechSynthesis;
   const Utterance = globalThis.window?.SpeechSynthesisUtterance;
@@ -89,7 +175,7 @@ export function speakWord(word, { onError } = {}) {
       const utterance = new Utterance(text);
       utterance.voice = voice;
       utterance.lang = voice.lang;
-      utterance.rate = 0.86;
+      utterance.rate = settings.rate;
       utterance.pitch = 1;
       utterance.volume = 1;
       utterance.onend = () => {
@@ -113,10 +199,10 @@ export function speakWord(word, { onError } = {}) {
   };
 
   try {
-    const voice = englishVoice(synth);
+    const voice = englishVoice(synth, settings.voiceURI);
     // Keep playback synchronous when voices exist, preserving click activation.
     if (voice) return Promise.resolve(play(voice));
-    return waitForEnglishVoice(synth).then(play);
+    return waitForEnglishVoice(synth, settings.voiceURI).then(play);
   } catch {
     return Promise.resolve(report("playback-failed"));
   }
