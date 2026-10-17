@@ -3,6 +3,8 @@ import "./study.css";
 import "./library.css";
 import "./sentence-battle.css";
 import "./plan.css";
+import "./home.css";
+import { homePage, homeShell } from "./home.js";
 import { createPlanController } from "./plan-ui.js";
 import {
   battleFormatUI,
@@ -213,9 +215,26 @@ function avatar(name = "?", cls = "") {
   return `<span class="avatar ${cls}" data-no-i18n>${escape(name.slice(0, 2).toUpperCase())}</span>`;
 }
 function navItem(page, label, icon) {
-  return `<button class="nav-item ${state.page === page ? "active" : ""}" data-page="${page}" aria-label="${label}" ${state.page === page ? 'aria-current="page"' : ""}>${icons[icon]}<span>${label}</span>${state.page === page ? '<span class="nav-dot"></span>' : ""}</button>`;
+  const mobileLabel =
+    {
+      arena: "Арена",
+      study: "Учиться",
+      leaders: "Rank",
+      words: "Words",
+      plan: "Plan",
+      profile: "Profile",
+    }[page] || label;
+  return `<button class="nav-item ${state.page === page ? "active" : ""}" data-page="${page}" aria-label="${label}" ${state.page === page ? 'aria-current="page"' : ""}>${icons[icon]}<span class="nav-full-label">${label}</span><span class="mobile-nav-label" data-no-i18n aria-hidden="true">${escape(t(mobileLabel, state.language))}</span>${state.page === page ? '<span class="nav-dot"></span>' : ""}</button>`;
 }
 function shell(content) {
+  if (state.page === "welcome")
+    return homeShell(content, {
+      language: state.language,
+      escape,
+      icons,
+      user: state.user,
+      username: state.profile?.username,
+    });
   return `<aside class="sidebar"><a class="brand" href="#" aria-label="10Qadam, главная"><span class="brand-mark" role="img" aria-label="Логотип 10Qadam"></span><span>10Qadam<span class="brand-sub">THE SPELLING ARENA</span></span></a><div class="nav-label">PLAYGROUND</div><nav aria-label="Главная навигация">${navItem("arena", "Арена", "arena")}${navItem("study", "Учиться", "cards")}${navItem("leaders", "Рейтинг", "chart")}${navItem("words", "Словарь", "book")}${navItem("plan", t("My study plan", state.language), "cards")}${navItem("profile", "Мой профиль", "user")}</nav><div class="sidebar-bottom"><div class="mini-note"><p>Маленькие шаги.<br><strong>Большой словарный запас.</strong></p></div><span class="side-version">MADE FOR YOUR NEXT LEVEL ↗</span></div></aside><div class="workspace"><header class="topbar"><div class="breadcrumb">PLAYGROUND <span>/</span> ${escape({ arena: "Арена", leaders: "Рейтинг", words: "Словарь", profile: "Профиль", plan: t("My study plan", state.language), game: "Матч", study: "Учиться", welcome: "Знакомство" }[state.page] || "Арена")}</div><div class="top-actions"><select id="language-select" aria-label="Language" title="Language">${[
     ["en", "EN"],
     ["kk", "KZ"],
@@ -281,34 +300,12 @@ function learningShortcut() {
   return `<section class="study-shortcut"><div class="study-shortcut-copy"><span class="study-kicker">A1–C1 · Start at your level</span><h2>Not just words.</h2><p>A place to practise before you compete. Flashcards, sentences and your own pace.</p><button class="button dark" data-page="study">Explore learning ${icons.arrow}</button></div>${study.mascot()}</section>`;
 }
 function renderWelcome() {
-  const tr = (key) => escape(t(key, state.language));
-  const levels = [
-    ["A1", "Beginner", "Everyday words. Your first sentences."],
-    ["A2", "Elementary", "Build confidence in familiar situations."],
-    ["B1", "Intermediate", "Express ideas and connect your thoughts."],
-    ["B2", "Upper intermediate", "More precise words. More complex ideas."],
-    ["C1", "Advanced", "Nuance, detail and fluent expression."],
-  ];
-  return `<div data-no-i18n><section class="welcome-hero"><div class="welcome-intro"><span class="study-kicker">10QADAM / ${tr("WHY 10QADAM")}</span><h1>${escape(slogan(state.language)[0])}<br><span class="underlined">${escape(slogan(state.language)[1])}</span></h1><p>${tr("Start where you are. Learn words, listen to real sentences and take your spelling to the arena.")}</p><a class="button dark" href="#choose-level">${tr("Choose your starting point")} ${icons.arrow}</a><button class="text-link" data-page="arena">${tr("Go to the arena")} ${icons.arrow}</button></div><div class="welcome-companion"><span class="study-kicker">${tr("A little practice. A bigger world.")}</span>${study.mascot()}<span class="welcome-note">${tr("Your level is a starting point, not a label.")}</span></div></section>
-  <section class="welcome-header" id="choose-level"><div><span class="study-kicker">${tr("Not another course to start over.")}</span><h2>${tr("Choose your starting point")}</h2><p>${tr("No placement test. No locked levels. You can switch at any time.")}</p></div></section><div class="welcome-level-grid">${levels.map(([level, label, description]) => `<a class="welcome-level-card" href="/learn/${level}" data-study-level="${level}"><strong>${level}</strong><h3>${tr(label)}</h3><p>${tr(description)}</p><span>${icons.arrow}</span></a>`).join("")}</div><p class="study-meta">${tr("Practice collections, not a certified CEFR assessment.")}</p>
-  <section class="welcome-header"><span class="study-kicker">${tr("HOW IT WORKS")}</span><h2>${tr("English, one confident step at a time.")}</h2></section><div class="welcome-steps">${[
-    ["01", "Meet a word", "Flip a card, hear the word and make it yours."],
-    [
-      "02",
-      "Hear the whole thought",
-      "Type a short sentence. See exactly where you can improve.",
-    ],
-    [
-      "03",
-      "Put it into play",
-      "Ready for a challenge? Join a spelling match at your level, A1 to C1.",
-    ],
-  ]
-    .map(
-      ([n, title, description]) =>
-        `<article><span class="study-kicker">${n}</span><h3>${tr(title)}</h3><p>${tr(description)}</p></article>`,
-    )
-    .join("")}</div></div>`;
+  return homePage({
+    language: state.language,
+    escape,
+    icons,
+    level: study.getLevel(),
+  });
 }
 function renderBattleFormat() {
   return battleFormatUI(state, escape);
@@ -531,11 +528,20 @@ function renderFilteredWords(query = state.wordQuery, resetPage = false) {
 }
 
 document.addEventListener("click", async (event) => {
+  const homeAnchor = event.target.closest(".home-mobile-menu a");
+  if (homeAnchor) homeAnchor.closest("details")?.removeAttribute("open");
   if (plan.click(event)) return;
   const el = event.target.closest(
     "button,a.brand,a.footer-brand,a[data-study-level]",
   );
   if (!el) return;
+  if (["cards", "sentences"].includes(el.dataset.homePractice)) {
+    navigate("study");
+    study.action({
+      dataset: { studyAction: "tab", value: el.dataset.homePractice },
+    });
+    return;
+  }
   if (el.dataset.studyAction || el.dataset.studyLevel) {
     event.preventDefault();
     study.action(el);

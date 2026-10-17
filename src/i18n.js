@@ -5,6 +5,7 @@ import { LIBRARY_COPY } from "./library-copy.js";
 import { ACCOUNT_COPY } from "./account-copy.js";
 import { SENTENCE_COPY } from "./sentence-copy.js";
 import { PLAN_COPY } from "./plan-copy.js";
+import { HOME_COPY } from "./home-copy.js";
 export const LANGUAGES = ["en", "kk", "ru"];
 export const LOCALES = { en: "en-GB", kk: "kk-KZ", ru: "ru-RU" };
 export const COPY = {
@@ -13,6 +14,7 @@ export const COPY = {
   ...ACCOUNT_COPY,
   ...SENTENCE_COPY,
   ...PLAN_COPY,
+  ...HOME_COPY,
   Арена: ["Arena", "Арена"],
   Рейтинг: ["Leaderboard", "Рейтинг"],
   Словарь: ["Word bank", "Сөздік"],
