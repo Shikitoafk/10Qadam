@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#153a42"/><stop offset="1" stop-color="#a7bda3"/></linearGradient>
+    <linearGradient id="hill" x2="0" y2="1"><stop stop-color="#335e54"/><stop offset="1" stop-color="#122c2d"/></linearGradient>
+    <pattern id="dots" width="23" height="29" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".65" fill="#fcf7da" opacity=".28"/></pattern>
+    <path id="pine" d="m0 0 14 28h-6l11 17h-8l13 20H3v11h-6V65h-21l13-20h-8l11-17h-6Z"/>
+  </defs>
+  <rect width="1000" height="600" fill="url(#sky)"/>
+  <rect width="1000" height="320" fill="url(#dots)"/>
+  <circle cx="746" cy="151" r="63" fill="#f4edcc" opacity=".83"/>
+  <path d="M0 390 90 311l84 37 90-110 85 68 70-33 155 99 124-34 98-57 85 53 119-67v333H0Z" fill="#6c9991"/>
+  <path d="M0 393q157-93 306-11t305 8 389-56v266H0Z" fill="#4d7c73"/>
+  <path d="M0 421q133-19 271 45 113 37 265-19 255-89 464-47v200H0Z" fill="url(#hill)"/>
+  <path d="M0 500q197-32 321 27t307-10q207-63 372-53v136H0Z" fill="#172f32"/>
+  <g fill="#102b2e"><use href="#pine" transform="translate(44 352) scale(2.4)"/><use href="#pine" transform="translate(91 424) scale(1.5)"/><use href="#pine" transform="translate(139 461) scale(1.15)"/><use href="#pine" transform="translate(862 432) scale(1.6)"/><use href="#pine" transform="translate(938 367) scale(2.4)"/><use href="#pine" transform="translate(978 402) scale(2)"/></g>
+</svg>

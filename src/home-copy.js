@@ -1,4 +1,5 @@
 export const HOME_COPY = {
+  "Study Studio": ["Study Studio", "Оқу студиясы", "Учебная студия"],
   Rank: ["Rank", "Рейтинг", "Рейтинг"],
   Plan: ["Plan", "Жоспар", "План"],
   Profile: ["Profile", "Профиль", "Профиль"],

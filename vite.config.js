@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -16,11 +17,21 @@ export default defineConfig(({ mode }) => {
     origin = parsed.origin;
   }
   return {
+    build: {
+      rollupOptions: {
+        input: {
+          main: fileURLToPath(new URL("./index.html", import.meta.url)),
+          studio: fileURLToPath(
+            new URL("./studio/index.html", import.meta.url),
+          ),
+        },
+      },
+    },
     plugins: [
       {
         name: "spell-arena-search",
-        transformIndexHtml() {
-          return origin
+        transformIndexHtml(_html, { path }) {
+          return origin && !path.startsWith("/studio")
             ? [
                 {
                   tag: "link",
@@ -53,7 +64,7 @@ export default defineConfig(({ mode }) => {
           this.emitFile({
             type: "asset",
             fileName: "sitemap.xml",
-            source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/arena", "/words", "/plan", ...["A1", "A2", "B1", "B2", "C1"].map((level) => `/learn/${level}`)].map((path) => `<url><loc>${origin}${path}</loc></url>`).join("")}</urlset>\n`,
+            source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/studio/", "/arena", "/words", "/plan", ...["A1", "A2", "B1", "B2", "C1"].map((level) => `/learn/${level}`)].map((path) => `<url><loc>${origin}${path}</loc></url>`).join("")}</urlset>\n`,
           });
         },
       },

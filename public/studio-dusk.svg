@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#292947"/><stop offset=".63" stop-color="#a26e85"/><stop offset="1" stop-color="#f6bc8f"/></linearGradient>
+    <pattern id="windows" width="24" height="25" patternUnits="userSpaceOnUse"><path d="M4 4h8v10H4z" fill="#f9d188" opacity=".53"/></pattern>
+  </defs>
+  <rect width="1000" height="600" fill="url(#sky)"/>
+  <circle cx="745" cy="220" r="83" fill="#f4c69b"/>
+  <path d="M0 410 107 321l63 53 52-15 56-72 112 78 60-23 73 45 117-61 62 31 77-35 135 59 86-70v289H0Z" fill="#674e70"/>
+  <path d="M0 434h55v-34h56v-72h58v103h54v-55h68v93h67v-23h62v-31h53v69h108v-87h59v47h45V335h64v109h77v-61h61v35h45v-82h68v264H0Z" fill="#3d3a55"/>
+  <path d="M23 466h79v-48h69v30h69v-72h65v97h70v-26h74v47h95v-38h68v21h79v-55h57v58h73v-94h79v68h100v146H0V466Z" fill="#262d43"/>
+  <path d="M23 466h79v-48h69v30h69v-72h65v97h70v-26h74v47h95v-38h68v21h79v-55h57v58h73v-94h79v68h100v146H0V466Z" fill="url(#windows)"/>
+</svg>

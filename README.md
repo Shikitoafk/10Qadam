@@ -80,3 +80,20 @@ npm run build
 - Реальная проверка онлайн требует своего Supabase и двух/четырёх отдельных аккаунтов. Не считай успешную локальную сборку проверкой работающего облачного матчмейкинга.
 
 Схема базы, настройка авторизации и проверка онлайн: [supabase/README.md](supabase/README.md).
+
+## 10Qadam Study Studio
+
+Open `/studio/` from the 10Qadam home navigation. This separate entry point keeps
+the existing English arena and Supabase accounts untouched.
+
+- Today and Plan: create, edit, schedule and complete dated tasks.
+- Focus: choose 1–120 minutes, a task and one of three illustrated backgrounds.
+  Pause/resume and reload use a saved deadline. The quiet view hides navigation.
+- Cards: make decks of prompts and answers, flip them, and repeat missed items.
+- Game: the dog runs into the selected lane. Two distinct answers in a deck
+  unlock a round of up to ten prompts, with touch and 1–3 keyboard controls.
+- Progress: a completed focus session counts toward a daily streak; it stays
+  active through the following day while there is still time to study.
+
+Studio data stays in this browser (no sign-in or cross-device sync).
+Use the `/studio/` path on the Vite development server for local testing.
